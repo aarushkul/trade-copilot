@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade Copilot — MNQ</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/vendor/lightweight-charts.js"></script>
+</head>
+<body>
+<header id="topbar">
+  <div class="brand">
+    <span class="logo">◮</span>
+    <div>
+      <div class="title">Trade Copilot</div>
+      <div class="sub" id="symbol">—</div>
+    </div>
+  </div>
+  <div class="price-block">
+    <div class="big-price" id="price">—</div>
+    <div class="sub" id="bidask">bid — / ask —</div>
+  </div>
+  <div class="chips">
+    <span class="chip" id="phase">—</span>
+    <span class="chip" id="feed-dot"><span class="dot"></span><span id="feed-label">connecting</span></span>
+    <span class="chip" id="clock">—</span>
+  </div>
+  <div class="day-stats">
+    <div class="stat"><label>Today P&L</label><span id="stat-pnl">$0</span></div>
+    <div class="stat"><label>Win rate</label><span id="stat-wr">—</span></div>
+    <div class="stat"><label>Signals</label><span id="stat-count">0</span></div>
+  </div>
+  <button id="settings-btn" title="Settings">⚙</button>
+</header>
+
+<div id="breaker-banner" class="hidden">
+  CIRCUIT BREAKER — <span id="breaker-text">2 stop-outs today. Done for the day. Protect the account.</span>
+</div>
+
+<main>
+  <section id="chart-panel">
+    <div id="chart"></div>
+    <div id="readouts">
+      <span class="ro">VWAP <b id="ro-vwap">—</b></span>
+      <span class="ro">EMA9/21 1m <b id="ro-ema1">—</b></span>
+      <span class="ro">EMA9/21 5m <b id="ro-ema5">—</b></span>
+      <span class="ro">RSI <b id="ro-rsi">—</b></span>
+      <span class="ro">ATR 5m <b id="ro-atr">—</b></span>
+      <span class="ro">RelVol <b id="ro-rvol">—</b></span>
+    </div>
+  </section>
+
+  <aside id="side">
+    <div id="signal-card" class="stand-aside">
+      <div class="sc-status" id="sc-status">STAND ASIDE</div>
+      <div class="sc-reason" id="sc-reason">warming up…</div>
+      <div class="sc-body hidden" id="sc-body">
+        <div class="sc-grid">
+          <div><label>Entry</label><span id="sc-entry">—</span></div>
+          <div><label>Stop</label><span id="sc-stop">—</span></div>
+          <div><label>Target 1</label><span id="sc-t1">—</span></div>
+          <div><label>Target 2</label><span id="sc-t2">—</span></div>
+          <div><label>Contracts</label><span id="sc-size">—</span></div>
+          <div><label>Risk</label><span id="sc-risk">—</span></div>
+        </div>
+        <div class="sc-ttl" id="sc-ttl"></div>
+        <ul class="sc-reasons" id="sc-reasons"></ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Current read</h3>
+      <ul id="votes" class="votes"><li class="muted">no votes yet</li></ul>
+      <div id="chop-line" class="muted"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Signal history <span class="muted" id="alltime-line"></span></h3>
+      <table id="history">
+        <thead><tr><th>Time</th><th>Call</th><th>Entry</th><th>Result</th><th>P&L</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </aside>
+</main>
+
+<div id="settings-modal" class="hidden">
+  <div class="modal-card">
+    <h2>Settings</h2>
+    <form id="settings-form">
+      <label>A-grade risk ($)<input type="number" name="risk_a_grade" step="10"></label>
+      <label>B-grade risk ($)<input type="number" name="risk_b_grade" step="10"></label>
+      <label>Max contracts<input type="number" name="max_contracts" min="1" max="10"></label>
+      <label>Circuit breaker stop-outs<input type="number" name="circuit_breaker_losses" min="1" max="10"></label>
+      <label class="check"><input type="checkbox" name="circuit_breaker_enabled"> Circuit breaker on</label>
+      <label class="check"><input type="checkbox" name="rth_only"> RTH signals only</label>
+      <label class="check"><input type="checkbox" name="lunch_a_grade_only"> Lunch: A-grade only</label>
+      <label class="check"><input type="checkbox" name="sound_enabled"> Sound alerts</label>
+      <label>Signal cooldown (sec)<input type="number" name="signal_cooldown_sec" step="30"></label>
+      <div class="modal-actions">
+        <button type="button" id="settings-cancel">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
