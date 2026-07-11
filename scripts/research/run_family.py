@@ -53,6 +53,24 @@ def main() -> None:
 
     if hasattr(mod, "report"):
         print(mod.report(results))
+    elif hasattr(mod, "AXES"):
+        from app.research.families.common import survivors
+        passed = [r for r in results if r[2].get("train_pass")]
+        print(f"train-gate passers: {len(passed)}/{len(results)}")
+        for p, m, _ in sorted(passed, key=lambda r: -r[1].get("expectancy_usd", 0))[:10]:
+            print(f"  PASS {json.dumps(p)}")
+            print(f"       n={m['n']} pf={m['pf']:.2f} exp=${m['expectancy_usd']:.2f} "
+                  f"t={m['bootstrap_t']:.1f} months+={m['months_pos_frac']:.0%} "
+                  f"top10={m['top10_share']:.0%} stress_pf={m.get('stress_pf')}")
+        surv = survivors(results, mod.AXES)
+        print(f"survivors (<=2 non-adjacent): {json.dumps(surv)}")
+        best = sorted(results, key=lambda r: -(r[1].get("pf", 0) if r[1].get("n", 0) >= 50 else 0))[:5]
+        print("top PF regardless of gates (n>=50):")
+        for p, m, g in best:
+            print(f"  {json.dumps(p)}")
+            print(f"       n={m.get('n')} pf={m.get('pf', 0):.2f} "
+                  f"exp=${m.get('expectancy_usd', 0):.2f} t={m.get('bootstrap_t', 0):.1f}"
+                  f" failed={','.join(g.get('failed', [])) or '-'}")
     else:
         for params, metrics, gates in results:
             flag = ""
