@@ -21,3 +21,8 @@ reversion edge doesn't exist at these costs.
 - target: VWAP touch OR fixed {1R, 1.5R}; horizon {60 min, hold-to-close-window}
 
 ## Grid size ≈ 3·2·3·2·2·2 ≈ 144 points. Expected frequency: 0.5–2 trades/session.
+
+## Pre-registration addendum — 2026-07-11, before first registration
+Regime layer FAILED (see regime.md): the regime arm collapses to
+"unconditioned" per the grid note above. tod windows fixed from the tod
+study: tod-window-1 = 11:00–14:00 ET, tod-window-2 = 10:30–15:00 ET.

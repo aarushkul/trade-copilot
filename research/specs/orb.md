@@ -21,3 +21,9 @@ on QQQ/day-session).
 - target: {1R, 2R} OR hold-to-close arm
 
 ## Grid ≈ 3·2·2·2·2·2·2·3 ≈ 288 → prune to ≤ 200 at freeze. Expected: 0–1 trades/session.
+
+## Pre-registration addendum — 2026-07-11, before first registration
+Regime layer FAILED (see regime.md): regime arm collapses to {any}. The
+break-before-{11:00, 12:00} windows stand as specced (structural, not
+tod-derived). tod study note: 09:30–10:00 has the worst unconditional drag,
+so the volume/freshness conditions carry the whole burden of proof.

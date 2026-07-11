@@ -143,11 +143,14 @@ COLUMNS = [
 
 
 def build_session(bars: list[Bar], noise: NoiseBands,
-                  prev_rth: dict | None, or15_med: float | None) -> pd.DataFrame:
+                  prev_rth: dict | None, or15_med: float | None,
+                  cumvol_ref: np.ndarray | None = None) -> pd.DataFrame:
     """Feature rows for one session. `noise` must already hold ONLY prior
     sessions; this function feeds it the current session's RTH bars as it
     walks (bands_at uses prior sessions only — NoiseBands averages stored
-    session profiles, and the current session is appended at session end)."""
+    session profiles, and the current session is appended at session end).
+    `cumvol_ref` is the trailing 14-session mean cumulative RTH volume per
+    minute-of-RTH (session_cumvol_profile), prior sessions only."""
     n = len(bars)
     out = {c: np.full(n, np.nan, dtype=np.float64) for c in COLUMNS}
     closes: list[float] = []
@@ -173,7 +176,7 @@ def build_session(bars: list[Bar], noise: NoiseBands,
     prev_side = 0
     beyond_since = 0
     prev_beyond = 0
-    cum_session_vol = 0.0
+    rth_cum_vol = 0.0
 
     for i, b in enumerate(bars):
         et = datetime.fromtimestamp(b.ts, tz=ET)
@@ -181,7 +184,6 @@ def build_session(bars: list[Bar], noise: NoiseBands,
         is_rth = RTH_OPEN_MIN <= minute_et < RTH_CLOSE_MIN
         closes.append(b.close)
         vols.append(b.volume)
-        cum_session_vol += b.volume
 
         tr = b.high - b.low if prev_close is None else max(
             b.high - b.low, abs(b.high - prev_close), abs(b.low - prev_close))
@@ -277,6 +279,12 @@ def build_session(bars: list[Bar], noise: NoiseBands,
         if len(vols) > 20:
             base = np.mean(vols[-21:-1])
             row_i["rvol_1m"][i] = b.volume / base if base else np.nan
+        if is_rth:
+            rth_cum_vol += b.volume
+            rm = minute_et - RTH_OPEN_MIN
+            if (cumvol_ref is not None and 0 <= rm < len(cumvol_ref)
+                    and cumvol_ref[rm] > 0):
+                row_i["cumvol_vs_14d"][i] = rth_cum_vol / cumvol_ref[rm]
         if a1:
             row_i["ema9_1m_dist_atr"][i] = (b.close - e9) / a1
             row_i["ema21_1m_dist_atr"][i] = (b.close - e21) / a1
@@ -331,6 +339,33 @@ def build_session(bars: list[Bar], noise: NoiseBands,
     return df
 
 
+RTH_MINUTES = RTH_CLOSE_MIN - RTH_OPEN_MIN
+
+
+def session_cumvol_profile(bars: list[Bar]) -> np.ndarray | None:
+    """Cumulative RTH volume at each minute-of-RTH, gaps forward-filled.
+    None when RTH coverage is too thin to be a fair volume reference."""
+    prof = np.full(RTH_MINUTES, np.nan)
+    cum = 0.0
+    covered = 0
+    for b in bars:
+        et = datetime.fromtimestamp(b.ts, tz=ET)
+        m = et.hour * 60 + et.minute
+        if RTH_OPEN_MIN <= m < RTH_CLOSE_MIN:
+            cum += b.volume
+            prof[m - RTH_OPEN_MIN] = cum
+            covered += 1
+    if covered < 300:
+        return None
+    last = np.nan
+    for i in range(RTH_MINUTES):          # forward-fill missing minutes
+        if math.isnan(prof[i]):
+            prof[i] = last
+        else:
+            last = prof[i]
+    return prof
+
+
 FEATURES_DIR_NAME = "features"
 
 
@@ -357,12 +392,15 @@ def build_all(verbose: bool = True) -> dict[str, int]:
     noise = NoiseBands()
     prev_rth: dict | None = None
     or15_hist: deque[float] = deque(maxlen=14)
+    cumvol_hist: deque[np.ndarray] = deque(maxlen=14)
     frames: dict[str, list[pd.DataFrame]] = {"train": [], "validation": [], "holdout": []}
 
     for sd in sorted(all_sessions):
         bars = all_sessions[sd]
         or15_med = median(or15_hist) if or15_hist else None
-        df = build_session(bars, noise, prev_rth, or15_med)
+        cumvol_ref = (np.nanmean(np.stack(cumvol_hist), axis=0)
+                      if cumvol_hist else None)
+        df = build_session(bars, noise, prev_rth, or15_med, cumvol_ref)
         if not meta[sd].is_roll:
             df.insert(0, "session", sd)
             frames[splits.split_of(sd)].append(df)
@@ -371,6 +409,9 @@ def build_all(verbose: bool = True) -> dict[str, int]:
             prev_rth = summ
             if summ.get("or15_width"):
                 or15_hist.append(summ["or15_width"])
+        prof = session_cumvol_profile(bars)
+        if prof is not None:
+            cumvol_hist.append(prof)
 
     counts = {}
     out = _features_dir()

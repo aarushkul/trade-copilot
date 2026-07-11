@@ -32,3 +32,20 @@ dependent family is graded.
 A `regime_at(session, minute)` feature ∈ {unknown, trend_up, trend_down, range}
 added to the feature store (FEATURE_VERSION bump), plus a frozen-parameters
 section appended to this file.
+
+## RESULT — 2026-07-11, train (run r-20260711-200234-d1de39b0)
+
+**FAILED. The layer is dead; dependent families run unconditioned.**
+
+All 26 grid variants failed the freeze gate. Best separation bootstrap-t was
++0.81 (band_breach k=5 m=30) against the required ≥ 2; no variant had
+sign-stable positive separation across 2023/2024/2025. Detector agreement
+with the trend-day label barely beat the 16.7% base rate (precision ≤ 0.34
+at the strictest threshold). Early direction does mildly persist on detected
+"trend" sessions (signed drift +0.1..+0.9 ATR), but the trend/range classes
+do not differ in drift magnitude, which is what the gate demanded.
+
+Exploratory anomaly, recorded but NOT actionable without a fresh
+registration: cumvol ≥ 1.2 at minute 90 separates INVERSELY (sep_t −3.59,
+negative in all three years) — elevated relative volume by 11:00 predicts
+LESS remaining drift-to-close, not more.

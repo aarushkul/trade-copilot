@@ -21,3 +21,8 @@ nothing. If neither conditioned arm passes train gates, levels are decoration.
 - target: {1R, 2R}; horizon 60 min
 
 ## Grid ≈ 3·2·(2·2 + 2·2)·2·2·3 ≈ 288 → prune ≤ 200 at freeze. Expected: 0–2 trades/session.
+
+## Pre-registration addendum — 2026-07-11, before first registration
+Regime layer FAILED (see regime.md): fade arm regime collapses to {any},
+break arm regime collapses to {any}. tod windows fixed: tod-window-1 =
+11:00–14:00 ET, tod-window-2 = 10:30–15:00 ET, plus full RTH.

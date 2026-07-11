@@ -20,3 +20,11 @@ train gates, intraday trend-following doesn't clear retail costs on MNQ.
 - target: {1.5R, 2R} OR trail-to-close arm
 
 ## Grid ≈ 2·2·2·2·2·2·2·3 ≈ 192. Expected: 0–2 trades/session (trend days only).
+
+## Pre-registration addendum — 2026-07-11, before first registration
+Regime layer FAILED (see regime.md), so "regime = trend" is replaced by a
+causal structural trend condition, fixed here before registration:
+price on one side of session VWAP for ≥ {60, 120} consecutive minutes
+(vwap_side_min) with ema21_1m_slope sign agreement; that side sets trade
+direction. Windows: {10:30–15:00 (as specced), tod-window-2 = 10:30–15:00
+is identical, so the alternate is tod-window-1 = 11:00–14:00 ET}.
