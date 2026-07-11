@@ -117,3 +117,27 @@ phase3_train_families.md. The next legitimate move is a future cycle with
 either (a) materially new hypotheses registered before evaluation, or
 (b) meaningfully more data (the levels-break n-gate failure becomes testable
 around double the current event count).
+
+## CYCLE 1b — train extension to contract launch (registered 2026-07-11, before evaluation)
+
+MNQ launched 2019-05-06; the cycle-1 corpus arbitrarily started 2023-01-01.
+Cycle 1b pulls 2019-05-06 → 2022-12-31 (16 contract windows, $4.69 of free
+credits) and folds it into TRAIN — splits.py already maps pre-2023 session
+dates to train, and older data cannot contaminate the untouched validation/
+holdout windows. Nothing else changes: same specs, same frozen grids, same
+gates, same sim-1. Every family + the ML track gets ONE new train
+registration on the extended corpus (fingerprint distinguishes it in the
+ledger). Motivation, stated before results: the cycle-1 near-misses failed
+dominantly on n >= 150 and concentration; doubling the event count is the
+pre-registered honest way to test whether they are patterns or dust.
+Survivors, if any, resume Phase 4 under the untouched look budgets.
+This section was written after the backfill was ordered but BEFORE any
+feature build or grid evaluation on the extended corpus.
+
+Cycle 1b data provenance notes: backfill ran 2026-07-11, $4.69 + $0.37
+repair (free credits). The range boundary initially truncated
+oos_MNQH3.json to Dec-2022-only; re-pulled the full H3 ownership window
+(2022-12-09..2023-03-09, 63 sessions) the same day, before any store
+rebuild or evaluation. The pull script now refuses to overwrite existing
+files. Databento degraded-quality days in the backfill range, recorded:
+2020-02-27/28, 2020-06-30, 2020-07-01, 2021-12-05, 2022-01-02.

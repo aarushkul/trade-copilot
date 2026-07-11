@@ -34,6 +34,12 @@ ET = ZoneInfo("America/New_York")
 PULL_START = date(2023, 1, 1)
 PULL_END = date(2025, 6, 15)  # existing oos_MNQU5.json takes over here
 
+# --backfill: MNQ launched 2019-05-06; extend train back to contract birth.
+# Everything here predates TRAIN_END, so it folds into train (splits.py maps
+# pre-2023 dates to train) without touching validation/holdout.
+BACKFILL_START = date(2019, 5, 6)
+BACKFILL_END = date(2023, 1, 1)   # original pull takes over here
+
 
 def db_symbol(schwab_sym: str) -> str:
     """'/MNQH23' -> Databento GLBX raw 'MNQH3' (single-digit year)."""
@@ -41,25 +47,29 @@ def db_symbol(schwab_sym: str) -> str:
     return s[:-2] + s[-1]
 
 
-def roll_windows() -> list[tuple[str, date, date]]:
-    """(db_symbol, start, end_exclusive) windows that tile PULL_START..PULL_END.
+def roll_windows(start: date = PULL_START, end: date = PULL_END,
+                 u5_gap: bool = True) -> list[tuple[str, date, date]]:
+    """(db_symbol, start, end_exclusive) windows that tile start..end.
 
-    Stops before MNQU5: the existing oos_MNQU5/Z5/H6/M6 files own everything
-    from there (immutable once pulled). The U5 gap window covers the two
-    U5-front sessions (Jun 12/13 2025) missing from the existing U5 file.
+    In the default (2023->2025) range this stops before MNQU5 — the existing
+    oos_MNQU5/Z5/H6/M6 files own everything from there (immutable once
+    pulled) — and appends the U5 gap window covering the two U5-front
+    sessions (Jun 12/13 2025) missing from the existing U5 file. Backfill
+    ranges skip both special cases.
     """
     windows: list[tuple[str, date, date]] = []
-    d = PULL_START
-    while d < PULL_END:
+    d = start
+    while d < end:
         sym = db_symbol(front_month_symbol(d))
-        if sym == "MNQU5":
+        if u5_gap and sym == "MNQU5":
             break
         if windows and windows[-1][0] == sym:
             windows[-1] = (sym, windows[-1][1], d + timedelta(days=1))
         else:
             windows.append((sym, d, d + timedelta(days=1)))
         d += timedelta(days=1)
-    windows.append(("MNQU5", date(2025, 6, 11), date(2025, 6, 15)))
+    if u5_gap:
+        windows.append(("MNQU5", date(2025, 6, 11), date(2025, 6, 15)))
     return windows
 
 
@@ -109,20 +119,25 @@ def integrity(sym: str, bars: list[dict], prev_last_close: float | None) -> None
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="print cost quote and exit")
+    ap.add_argument("--backfill", action="store_true",
+                    help="pull 2019-05-06..2023-01-01 (MNQ launch -> corpus start)")
     args = ap.parse_args()
 
     load_dotenv(Path(__file__).resolve().parents[2] / ".env")
     import databento as db
     client = db.Historical(os.getenv("DATABENTO_API_KEY"))
 
-    windows = roll_windows()
+    if args.backfill:
+        windows = roll_windows(BACKFILL_START, BACKFILL_END, u5_gap=False)
+    else:
+        windows = roll_windows()
     total = 0.0
     for sym, start, end in windows:
         total += client.metadata.get_cost(
             dataset="GLBX.MDP3", symbols=[sym], stype_in="raw_symbol",
             schema="ohlcv-1m", start=start.isoformat(), end=end.isoformat())
     print(f"{len(windows)} contract windows "
-          f"{windows[0][1]}..{windows[-2][2]} + U5 gap fill; quote ${total:.2f}")
+          f"{windows[0][1]}..{windows[-1][2]}; quote ${total:.2f}")
     if args.dry_run:
         return
 
@@ -141,6 +156,12 @@ def main() -> None:
             raise SystemExit(f"{sym}: empty response for {start}..{end}")
         suffix = "_pre" if sym == "MNQU5" else ""
         path = HISTORY_DIR / f"oos_{sym}{suffix}.json"
+        if path.exists():
+            raise SystemExit(
+                f"{path.name} already exists — pulled files are immutable. "
+                f"(The 2026-07-11 backfill truncated oos_MNQH3.json at the "
+                f"range boundary; it was re-pulled over its full ownership "
+                f"window. Delete the file first if a re-pull is intended.)")
         path.write_text(json.dumps(bars))
         integrity(sym, bars, prev_close if not suffix else None)
         prev_close = bars[-1]["close"]
