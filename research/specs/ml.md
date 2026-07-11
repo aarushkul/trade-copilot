@@ -39,3 +39,7 @@ sessions; otherwise production keeps the prior model.
 **FAILED — 0 grid points passed train gates.** See
 research/results/phase3_train_families.md and the ledger for per-point
 records. Not promoted to validation; look budget intact.
+
+## RESULT — 2026-07-11, cycle 1b (train extended to 2019)
+**FAILED again — 0 points passed** on 1,680 train sessions. See
+research/results/cycle1b_extended_train.md. Look budgets still intact.

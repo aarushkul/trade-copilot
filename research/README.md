@@ -141,3 +141,11 @@ oos_MNQH3.json to Dec-2022-only; re-pulled the full H3 ownership window
 rebuild or evaluation. The pull script now refuses to overwrite existing
 files. Databento degraded-quality days in the backfill range, recorded:
 2020-02-27/28, 2020-06-30, 2020-07-01, 2021-12-05, 2022-01-02.
+
+**Cycle 1b verdict (2026-07-11, same day):** 0/760 on the extended corpus.
+The cycle-1 vwap/trend near-misses collapsed on 2019-2022 data (the gates
+were correctly calibrated); levels-break persisted (PF 2.17, t 2.9, n 68 —
+fails only n >= 150) but is structurally too rare to trade; ML stayed
+sub-breakeven at 124k rows/fold. Combined cycles 1+1b: 1,520 registered
+evaluations, zero survivors. Phases 4-7 remain gated shut; all validation
+looks and the holdout look are unspent.
