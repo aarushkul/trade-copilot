@@ -34,3 +34,8 @@ data/research/models/ with hashes in the ledger. Integration decision
 Monthly refit on the expanding window; the refreshed model replaces production
 only if it re-passes validation-gate criteria on the newest ~20 unseen
 sessions; otherwise production keeps the prior model.
+
+## RESULT — 2026-07-11, train (cycle 1)
+**FAILED — 0 grid points passed train gates.** See
+research/results/phase3_train_families.md and the ledger for per-point
+records. Not promoted to validation; look budget intact.

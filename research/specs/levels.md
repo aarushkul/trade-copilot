@@ -26,3 +26,8 @@ nothing. If neither conditioned arm passes train gates, levels are decoration.
 Regime layer FAILED (see regime.md): fade arm regime collapses to {any},
 break arm regime collapses to {any}. tod windows fixed: tod-window-1 =
 11:00–14:00 ET, tod-window-2 = 10:30–15:00 ET, plus full RTH.
+
+## RESULT — 2026-07-11, train (cycle 1)
+**FAILED — 0 grid points passed train gates.** See
+research/results/phase3_train_families.md and the ledger for per-point
+records. Not promoted to validation; look budget intact.

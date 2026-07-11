@@ -28,3 +28,8 @@ price on one side of session VWAP for ≥ {60, 120} consecutive minutes
 (vwap_side_min) with ema21_1m_slope sign agreement; that side sets trade
 direction. Windows: {10:30–15:00 (as specced), tod-window-2 = 10:30–15:00
 is identical, so the alternate is tod-window-1 = 11:00–14:00 ET}.
+
+## RESULT — 2026-07-11, train (cycle 1)
+**FAILED — 0 grid points passed train gates.** See
+research/results/phase3_train_families.md and the ledger for per-point
+records. Not promoted to validation; look budget intact.

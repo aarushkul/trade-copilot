@@ -26,3 +26,8 @@ reversion edge doesn't exist at these costs.
 Regime layer FAILED (see regime.md): the regime arm collapses to
 "unconditioned" per the grid note above. tod windows fixed from the tod
 study: tod-window-1 = 11:00–14:00 ET, tod-window-2 = 10:30–15:00 ET.
+
+## RESULT — 2026-07-11, train (cycle 1)
+**FAILED — 0 grid points passed train gates.** See
+research/results/phase3_train_families.md and the ledger for per-point
+records. Not promoted to validation; look budget intact.

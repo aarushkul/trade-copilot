@@ -98,3 +98,22 @@ re-passes validation-gate criteria on the newest ~20 unseen sessions;
 otherwise production keeps the old config. Live journal decay monitor:
 live expectancy below the backtest p10 auto-flags a re-measure. Every cycle
 is ledger-logged. "Learns as it gets more data" — with a leash.
+
+---
+
+## CYCLE 1 VERDICT — 2026-07-11
+
+Executed Phases 0-3 in full. Regime layer: dead (26/26 detectors failed the
+freeze gate). Time-of-day: no positive bucket exists for unconditional
+canonical brackets. Rule families + ML: **0 of 760 registered train
+evaluations passed the pre-registered train gates** (best near-miss:
+levels-break, PF 1.84 at n=75 — too rare and too concentrated to trust).
+The ML track's ten-fold walk-forward peaked at PF 0.97 — below breakeven.
+
+Per the failure-honesty clause: no candidate advances; the holdout look and
+all validation looks remain unspent; **no live signal-trading from this
+cycle**. Details: research/results/phase2_train_studies.md and
+phase3_train_families.md. The next legitimate move is a future cycle with
+either (a) materially new hypotheses registered before evaluation, or
+(b) meaningfully more data (the levels-break n-gate failure becomes testable
+around double the current event count).

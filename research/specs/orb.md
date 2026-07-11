@@ -27,3 +27,8 @@ Regime layer FAILED (see regime.md): regime arm collapses to {any}. The
 break-before-{11:00, 12:00} windows stand as specced (structural, not
 tod-derived). tod study note: 09:30–10:00 has the worst unconditional drag,
 so the volume/freshness conditions carry the whole burden of proof.
+
+## RESULT — 2026-07-11, train (cycle 1)
+**FAILED — 0 grid points passed train gates.** See
+research/results/phase3_train_families.md and the ledger for per-point
+records. Not promoted to validation; look budget intact.
