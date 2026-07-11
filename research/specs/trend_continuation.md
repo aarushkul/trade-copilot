@@ -1,0 +1,22 @@
+# Spec: trend_continuation — pullbacks on confirmed trend days (family d)
+
+**Status:** DRAFT — grid frozen at first ledger registration.
+
+## Hypothesis (falsifiable)
+On genuine trend days, the first 1–3 pullbacks to dynamic support (EMA21 /
+VWAP) hold and continue; the edge concentrates mid-session (10:30–15:00)
+after the trend is identifiable. If regime-gated continuation can't pass
+train gates, intraday trend-following doesn't clear retail costs on MNQ.
+
+## Entry (feature terms)
+- regime = trend (its direction sets trade direction); detected by minute ≤ 90
+- pullback: retrace to within {0.25, 0.5} × atr_5m of {ema21_1m, session VWAP}
+  without closing beyond it against trend by > {0, 0.25} × atr_5m
+- resumption trigger: 1m close back in trend direction with rvol ≥ {none, 1.0}
+- pullback index ≤ {2, 3} of the session; window ∈ {10:30–15:00, tod windows}
+
+## Exit
+- stop: beyond pullback extreme by {0.25, 0.5} × atr_5m (5–45 pt clamp)
+- target: {1.5R, 2R} OR trail-to-close arm
+
+## Grid ≈ 2·2·2·2·2·2·2·3 ≈ 192. Expected: 0–2 trades/session (trend days only).

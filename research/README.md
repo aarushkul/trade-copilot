@@ -1,0 +1,100 @@
+# Signal Research Protocol — Pre-Registration
+
+This document is the binding contract for the signal redesign begun 2026-07-10.
+It is committed BEFORE any evaluation runs; git history is the timestamp.
+Results obtained outside this protocol do not count, no matter how good they look.
+
+**Why this exists:** the previous engine measured PF 1.41 on its 25 tuning
+sessions and PF 0.87 across 743 out-of-sample trades (188 unseen sessions,
+Jun 2025–May 2026). The in-sample edge was fitted air. The failure was
+process, not luck; this protocol is the corrected process.
+
+## Objective
+
+Find intraday MNQ signal rules/models with real positive expectancy net of
+costs (commission $0.74/side, 1 tick slippage/market fill), robust across
+regimes, deliverable as advisory calls in the existing engine.
+**The success criterion is a correct verdict — "no edge exists at these
+costs" is an acceptable, pre-registered outcome.**
+
+## Splits (as code: app/research/splits.py — the only sanctioned data door)
+
+| Split | session_date range | Contents | Access |
+|---|---|---|---|
+| TRAIN | 2023-01-01 .. 2025-12-10 | 2023–2025 Databento pull + oos_MNQU5/Z5 | unlimited, every grid ledger-registered |
+| VALIDATION | 2025-12-11 .. 2026-05-26 | oos_MNQH6/M6 (~119 sessions) | ≤ 2 looks per family, ledger-enforced |
+| HOLDOUT | 2026-05-27 .. forward | Schwab tape + walk-forward + live accumulation | exactly 1 look, assembled final system only |
+
+Roll-boundary sessions (bars from two contracts) are flagged and excluded by
+default. **Contamination acknowledgment:** family-level aggregates of the OLD
+engine on H6/M6 were observed once (2026-07-09) and old trade dumps exist in
+scratchpads; validation is therefore lightly bruised — acceptable for gating
+NEW families; holdout + paper are the real arbiters. Old dumps must not be
+consulted during research.
+
+## Ledger (app/research/ledger.py → research/ledger.jsonl, committed)
+
+- A **registration** record (family, spec_id, spec hash, full params grid,
+  split, data fingerprint, git sha) is written and fsynced BEFORE results are
+  computed. Every result record references its registration.
+- Validation/holdout registrations consume the look budget; exhaustion raises.
+- A tweaked grid/spec/fill-model/feature-version is a NEW registration.
+- Specs live in research/specs/ and are committed before their first
+  registration; the grid frozen at registration time is what counts.
+
+## Fill & cost model `sim-1` (versioned; changing it bumps the version)
+
+- Rules evaluate on **closed 1m bars**; orders act from the **next** bar.
+- Market entries: next bar open ± 1 tick slippage against you. Limit/stop
+  entries and limit targets require **1-tick trade-through** (touch ≠ fill).
+- Intra-bar path: up bar O→L→H→C, down bar O→H→L→C (same as replay/powell).
+- **Ambiguity rule: if a bar's range contains both stop and target, score STOP.**
+- Stops and time exits pay slippage; friction 2 × $0.74 per contract round trip.
+- Force-flat 15:59 ET; no entries 16:00–18:00; single bracket, 1 contract
+  (the live T1/T2 runner is integration-phase scope).
+
+## Gates (pre-registered; each stage can only shrink the survivor set)
+
+| Gate | Criteria |
+|---|---|
+| Train advance | PF ≥ 1.25 AND n ≥ 150 AND ≥ 60% of calendar months positive AND top-10-trade share of net < 40% AND session-block bootstrap-t ≥ 2 (10k resamples) AND PF > 1.0 at 1.5× slippage AND plateau rule: median PF of ±1 grid neighbors ≥ 1.15 |
+| Validation | PF ≥ 1.15 AND expectancy ≥ $4/trade net. ≤ 2 looks/family; the 2nd only for a pre-registered contingency, justified in the ledger |
+| Holdout | PF ≥ 1.1, assembled final system, full-engine replay, ONE look |
+| Paper (≥ 15 sessions) | signal rate within [0.5×, 2×] of backtest; realized expectancy within 1 bootstrap-σ; no behavioral divergence (entries at times/regimes the backtest wouldn't take) |
+
+**Winrate is never a selection criterion at any stage** (measured 2026-07-07:
+a 93.7%-winrate bracket lost $3.1k — winrate-optimizing selects for ruin).
+It is recorded for diagnostics. A style preference (e.g. preferring the
+higher-winrate of two survivors) may be applied only among validated survivors.
+Selection metric within a family: expectancy in R, subject to all gates.
+Carry at most the top-2 **non-adjacent** grid survivors per family to validation.
+
+## Harness verification (all must pass before Phase 2 begins)
+
+1. Golden deterministic sim tests: exact fills/costs on hand-built tapes.
+2. Anti-lookahead: random (session, t) feature rebuilds from bars[:t+1] must
+   be bit-equal to the cached matrix.
+3. `fwd_*` firewall: rule predicates may not reference forward columns.
+4. Cost arithmetic cross-checked to the cent vs app/journal/journal.py.
+5. Research-sim vs replay.py parity on a known segment + a golden parity tape.
+6. Placebo per finalist: entries shifted +5..+30 random minutes must collapse
+   expectancy toward cost drag; a profitable placebo indicts the harness.
+7. Data pull integrity: CME calendar counts, timestamp monotonicity, roll
+   continuity vs neighbor contract, spot-check vs existing U5 file.
+
+## Failure honesty
+
+If no family survives validation (a live possibility — the old engine's OOS
+base rate says retail 1m MNQ edges after costs are rare): no live signal
+trading; Trade Copilot remains a discipline/journal/levels tool; the
+infrastructure and data remain for future regimes; the verdict is recorded
+here and in the ledger.
+
+## Post-deployment learning loop (only if all gates pass)
+
+Monthly: append new sessions → rebuild features → refit/re-grade on the
+expanding train window → the refreshed config replaces production ONLY if it
+re-passes validation-gate criteria on the newest ~20 unseen sessions;
+otherwise production keeps the old config. Live journal decay monitor:
+live expectancy below the backtest p10 auto-flags a re-measure. Every cycle
+is ledger-logged. "Learns as it gets more data" — with a leash.
