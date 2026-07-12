@@ -149,3 +149,11 @@ fails only n >= 150) but is structurally too rare to trade; ML stayed
 sub-breakeven at 124k rows/fold. Combined cycles 1+1b: 1,520 registered
 evaluations, zero survivors. Phases 4-7 remain gated shut; all validation
 looks and the holdout look are unspent.
+
+**Cycle 2 verdict (2026-07-12):** orderflow via 1s tick-rule proxy — the
+pre-registered proxy-credibility gate FAILED (0.706 < 0.8), so the 0/72
+grid result is scoped "proxy too weak", not "order flow dead". True-flow
+decode verified (+0.686 delta-return corr). A full-fidelity test needs
+~$122/yr of NQ trades data (~$62 credits remain) — a user spending
+decision. Program totals: 1,592 registered evaluations, zero survivors,
+all look budgets intact.

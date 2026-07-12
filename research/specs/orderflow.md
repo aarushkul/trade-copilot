@@ -88,3 +88,11 @@ balance, so the registered design is amended as follows, blind to results:
 - **Staged spending rule**: if (and only if) something passes train gates,
   remaining credits may buy true trades for the same year to confirm
   BEFORE any validation look is considered.
+
+## RESULT — 2026-07-12, cycle 2 (train, 241 covered sessions)
+**FAILED, scoped as "proxy too weak" per the pre-pull addendum.** The
+credibility gate failed (corr proxy vs true delta 0.706 < 0.8; rolled
+windows 0.74-0.76). Rules 0/40 (best PF 1.12), ml-v2 0/32 (best PF 1.06).
+Side decode verified correct (+0.686). Order flow remains UNTESTED at
+full fidelity; a real test costs ~$122/yr of trades data. See
+research/results/cycle2_orderflow.md.
