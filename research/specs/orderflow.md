@@ -110,3 +110,22 @@ The proxy-credibility gate is replaced by the side-decode check only
 validation look may be considered on flow results without a full-fidelity
 train pass first. This section written blind — no true-trades data beyond
 the already-validated month has been seen.
+
+## Horizon study — registered 2026-07-12 BEFORE evaluation (user-directed)
+
+One month of true trades (2025-11-10..12-10, ~21 train sessions) cannot
+pass/fail the strategy gates (one month; n and months gates unreachable) —
+instead it powers a descriptive information-horizon study on ~8k RTH
+minutes: pooled Pearson corr of {delta_1m, imb_5m, imb_15m} vs NET forward
+MNQ close-to-close moves at {1, 5, 15, 30, 60} min, RTH-only, forward
+window within session; session-block bootstrap 95% CI (10k, seed 7).
+
+Decision rule, stated blind:
+- POSITIVE CONTROL: corr(delta_1m, fwd 1m) must be positive with CI
+  excluding 0 — else the instrument is broken and nothing else is read.
+- 30m and 60m columns (imb_5m, imb_15m): |corr| >= 0.05 with CI excluding
+  0 -> buying the full 2025 trades year ($112) is justified;
+  0.03-0.05 -> gray, user decides; < 0.03 or CI spans 0 -> flow carries no
+  bracket-horizon information; recommend NOT buying for this strategy
+  class. (Rough toll math: ~1.25 pts round-trip cost vs ~25 pt 60m sigma
+  needs corr ~0.05 at 1-sigma selectivity to break even.)
