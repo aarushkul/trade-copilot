@@ -62,3 +62,29 @@ the gate; beating 0.98 without passing gates is still a fail.
 ## Gates
 The standard pre-registered train gates, unchanged. Survivors, if any,
 resume Phase 4 under the untouched look budgets.
+
+## Pre-pull addendum — 2026-07-11, after cost quotes, BEFORE any data pull
+
+Quoted rates (NQ, per year): trades ~$122, tbbo ~$203, ohlcv-1s ~$42,
+bbo-1s ~$24. Full-range raw trades ($827) exceeds the entire credit
+balance, so the registered design is amended as follows, blind to results:
+
+- **Flow source = NQ ohlcv-1s, tick-rule proxy** (sign(close-open) per 1s
+  bar; doji -> sign vs previous 1s close; still flat -> volume split
+  50/50), aggregated to per-minute buy/sell volume. No per-trade sizes
+  exist in this schema, so fl_avg_size / fl_big_* are DROPPED from the
+  feature set. Activity proxy = count of active seconds per minute.
+- **Coverage = 2025-01-01 -> 2025-12-10 (train end)** — the most recent
+  full train year, chosen for regime recency. ~236 train sessions,
+  11 months. All gates unchanged; this is a reduced-power test and any
+  verdict is scoped to "1s tick-rule flow proxy, one year".
+- **Proxy validation**: one month of true NQ trades (2025-11-10 ->
+  2025-12-10, ~$10) used ONLY to correlate proxy minute-delta vs true
+  aggressor minute-delta. Proxy is credible if corr >= 0.8; below that,
+  the family verdict is "proxy too weak", not "order flow dead".
+- **ML-v2 folds**: with one covered year, quarterly folds are too few;
+  ML-v2 uses expanding MONTHLY walk-forward (min 3 months train, embargo
+  1 session) over the flow-covered sessions.
+- **Staged spending rule**: if (and only if) something passes train gates,
+  remaining credits may buy true trades for the same year to confirm
+  BEFORE any validation look is considered.
