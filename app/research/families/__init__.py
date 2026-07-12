@@ -5,7 +5,7 @@ from __future__ import annotations
 from importlib import import_module
 
 FAMILY_NAMES = ("regime", "tod", "vwap_reversion", "orb",
-                "trend_continuation", "levels", "ml")
+                "trend_continuation", "levels", "ml", "orderflow", "ml_flow")
 
 
 def get(name: str):
@@ -13,4 +13,6 @@ def get(name: str):
         raise KeyError(f"unknown family {name!r}; known: {FAMILY_NAMES}")
     if name == "ml":
         return import_module("app.research.ml.train")
+    if name == "ml_flow":
+        return import_module("app.research.ml.flow_track")
     return import_module(f"app.research.families.{name}")
