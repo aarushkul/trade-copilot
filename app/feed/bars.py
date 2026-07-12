@@ -12,6 +12,7 @@ TIMEFRAMES = {
     "1m": 60,
     "5m": 300,
     "15m": 900,
+    "1h": 3600,
 }
 
 
@@ -36,7 +37,14 @@ class BarSeries:
         bucket = self.bucket(q.ts)
         closed = None
         if self.forming is None:
-            self.forming = Bar(bucket, q.last, q.last, q.last, q.last, q.last_size)
+            if self.bars and self.bars[-1].ts >= bucket:
+                # Seeded history (e.g. Schwab) includes the current partial
+                # bar. Resume it as the forming bar instead of creating a
+                # duplicate timestamp, which corrupts indicators and charts.
+                self.forming = self.bars.pop()
+                self.forming.update(q.last, q.last_size)
+            else:
+                self.forming = Bar(bucket, q.last, q.last, q.last, q.last, q.last_size)
         elif bucket > self.forming.ts:
             closed = self.forming
             self.bars.append(closed)

@@ -1,6 +1,7 @@
 """Runtime wiring: feed -> engine -> journal -> hub, plus chart bar cache."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import asdict
 from typing import Optional
@@ -21,10 +22,12 @@ class Runtime:
         self.settings = Settings.load()
         self.settings.save()
         self.engine = SignalEngine(self.settings)
-        self.journal = Journal(DB_FILE, self.settings, self.engine.breaker)
+        self.journal = Journal(DB_FILE, self.settings, self.engine.breaker,
+                               source="sim" if feed_mode == "sim" else "live")
         self.hub = Hub()
         self.feed = None
         self.symbol = "SIM/MNQ"
+        self.shutdown_event = asyncio.Event()
 
         # Wire callbacks.
         self.engine.on_state = self._on_state
@@ -44,7 +47,9 @@ class Runtime:
                     ".venv/bin/python scripts/schwab_login.py")
             self.feed = SchwabFeed(creds)
             self.symbol = self.feed.symbol
-            bars = self.feed.fetch_history(days=10)
+            # 25 calendar days ≈ 17 sessions: enough to prime the 14-session
+            # noise bands as well as levels/indicators.
+            bars = self.feed.fetch_history(days=25)
             if bars:
                 self.engine.seed_history(bars)
         else:

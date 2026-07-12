@@ -69,6 +69,13 @@ def create_app(runtime) -> FastAPI:
         except WebSocketDisconnect:
             hub.clients.discard(ws)
 
+    @app.post("/api/shutdown")
+    async def shutdown():
+        hub.broadcast({"type": "shutdown"})
+        await asyncio.sleep(0.3)   # let the goodbye message reach dashboards
+        runtime.shutdown_event.set()
+        return {"ok": True}
+
     @app.get("/api/health")
     async def health():
         return {

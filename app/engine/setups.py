@@ -17,6 +17,10 @@ from app.indicators.core import (
     is_bullish_pin,
     rsi_divergence,
 )
+from app.indicators.structure import (
+    MultiTimeframeStructure,
+    StructureKind,
+)
 from app.models import Bar, Direction, Vote
 
 
@@ -30,6 +34,8 @@ class MarketContext:
     bars_1m: list[Bar] = field(default_factory=list)
     bars_5m: list[Bar] = field(default_factory=list)
     bars_15m: list[Bar] = field(default_factory=list)
+    bars_1h: list[Bar] = field(default_factory=list)
+    structure: Optional[MultiTimeframeStructure] = None
     vwap: Optional[float] = None
     vwap_sigma: Optional[float] = None
     ema9_1m: Optional[float] = None
@@ -41,6 +47,16 @@ class MarketContext:
     atr_5m: Optional[float] = None
     rvol_1m: Optional[float] = None
     levels: Levels = field(default_factory=Levels)
+    noise_lower: Optional[float] = None   # time-of-day noise band (see noise.py)
+    noise_upper: Optional[float] = None
+
+    def beyond_noise(self) -> Optional[Direction]:
+        """Direction of abnormal displacement, None while inside the band."""
+        if self.noise_upper is not None and self.price > self.noise_upper:
+            return Direction.LONG
+        if self.noise_lower is not None and self.price < self.noise_lower:
+            return Direction.SHORT
+        return None
 
     # -- trend helpers ---------------------------------------------------------
 
@@ -154,8 +170,11 @@ def vwap_setups(ctx: MarketContext) -> list[Vote]:
         votes.append(vote)
 
     # Extreme band fades: need band touch + rejection candle + RSI extreme.
+    # Regime gate: never fade while price is beyond the time-of-day noise band.
+    # A +2σ VWAP stretch on a genuine trend day is trend, not "overdone" —
+    # fading it is the classic way range traders donate money on trend days.
     bands2 = ctx.band(2.0)
-    if bands2 and ctx.rsi_1m is not None:
+    if bands2 and ctx.rsi_1m is not None and ctx.beyond_noise() is None:
         lo2, hi2 = bands2
         if b1.high >= hi2 and ctx.rsi_1m >= 70 and (
                 is_bearish_pin(b1) or is_bearish_engulfing(b2, b1)):
@@ -302,8 +321,112 @@ def patterns(ctx: MarketContext) -> list[Vote]:
     return votes
 
 
+def noise_momentum(ctx: MarketContext) -> list[Vote]:
+    """Intraday momentum on a fresh break of the time-of-day noise band.
+
+    Evidence: Zarattini/Barbon/Aziz (SSRN 4824172) — displacement beyond the
+    average move-from-open for this minute of day marks abnormal demand or
+    supply, and continuation (not reversion) follows on average. Freshness cap
+    avoids chasing an extended trend leg far past the band.
+    """
+    votes: list[Vote] = []
+    if (ctx.noise_upper is None or ctx.noise_lower is None
+            or ctx.phase not in (Phase.OPEN_DRIVE, Phase.MORNING,
+                                 Phase.LUNCH, Phase.AFTERNOON)
+            or len(ctx.bars_1m) < 3):
+        return votes
+    last = ctx.bars_1m[-1]
+    fresh = 12.0
+    vol_ok = ctx.rvol_1m is not None and ctx.rvol_1m >= 1.1
+
+    if last.close > ctx.noise_upper and 0 < last.close - ctx.noise_upper <= fresh \
+            and vol_ok and ctx.trend_5m() != Direction.SHORT:
+        votes.append(Vote(
+            Direction.LONG, 2.0,
+            f"1m close {last.close:.2f} broke above noise band "
+            f"({ctx.noise_upper:.2f}) — abnormal buy imbalance for this time of day",
+            "noise_mom", is_trend_aligned=ctx.trend_5m() == Direction.LONG,
+            is_volume_confirmed=ctx.rvol_1m >= VOLUME_CONFIRM_RVOL))
+    elif last.close < ctx.noise_lower and 0 < ctx.noise_lower - last.close <= fresh \
+            and vol_ok and ctx.trend_5m() != Direction.LONG:
+        votes.append(Vote(
+            Direction.SHORT, 2.0,
+            f"1m close {last.close:.2f} broke below noise band "
+            f"({ctx.noise_lower:.2f}) — abnormal sell imbalance for this time of day",
+            "noise_mom", is_trend_aligned=ctx.trend_5m() == Direction.SHORT,
+            is_volume_confirmed=ctx.rvol_1m >= VOLUME_CONFIRM_RVOL))
+    return votes
+
+
+def ict_structure(ctx: MarketContext) -> list[Vote]:
+    """Multi-timeframe BOS / CHoCH / liquidity sweep (ICT-style structure)."""
+    votes: list[Vote] = []
+    mtf = ctx.structure
+    if mtf is None:
+        return votes
+
+    htf = mtf.htf_bias()
+
+    # --- HTF bias confirmation (filter weight, not a standalone trigger) ---
+    if htf == "bullish":
+        votes.append(Vote(Direction.LONG, 0.75,
+                          "15m/1h structure bullish (HH+HL)", "structure"))
+    elif htf == "bearish":
+        votes.append(Vote(Direction.SHORT, 0.75,
+                          "15m/1h structure bearish (LH+LL)", "structure"))
+
+    def _add_event(tf: str, max_ago: int, bos_w: float, choch_w: float, sweep_w: float) -> None:
+        st = {"15m": mtf.m15, "5m": mtf.m5, "1m": mtf.m1, "1h": mtf.h1}[tf]
+        for ev in reversed(st.events_recent):
+            if ev.bars_ago > max_ago:
+                continue
+            aligned = htf in ("unknown", "ranging") or (
+                (ev.direction == Direction.LONG and htf != "bearish")
+                or (ev.direction == Direction.SHORT and htf != "bullish"))
+            if ev.kind == StructureKind.BOS:
+                w = bos_w if aligned else bos_w * 0.6
+                votes.append(Vote(ev.direction, w,
+                                  f"{tf} {ev.label()} ({ev.bars_ago} bars ago)",
+                                  "ict_bos", is_trend_aligned=aligned))
+            elif ev.kind == StructureKind.CHOCH:
+                votes.append(Vote(ev.direction, choch_w,
+                                  f"{tf} {ev.label()} — character shift ({ev.bars_ago} bars ago)",
+                                  "ict_choch", is_trend_aligned=False))
+            elif ev.kind == StructureKind.SWEEP:
+                votes.append(Vote(ev.direction, sweep_w,
+                                  f"{tf} liquidity sweep @ {ev.level:.2f} ({ev.bars_ago} bars ago)",
+                                  "ict_sweep"))
+
+    # HTF events: context (lower weight, longer memory)
+    _add_event("1h", max_ago=6, bos_w=1.0, choch_w=1.25, sweep_w=1.0)
+    _add_event("15m", max_ago=8, bos_w=1.25, choch_w=1.5, sweep_w=1.25)
+    # Intermediate timeframe: triggers
+    _add_event("5m", max_ago=6, bos_w=2.0, choch_w=1.75, sweep_w=1.75)
+    # Entry timeframe: confirmation only (weights below the 1.0 trigger
+    # threshold). Measured on real MNQ tape, raw 1m structure events churned
+    # out hundreds of noise entries; the proper ICT entry is the MTF stack
+    # below (5m break + 1m confirmation), which still triggers.
+    _add_event("1m", max_ago=4, bos_w=0.9, choch_w=0.75, sweep_w=0.9)
+
+    # Classic ICT sequence: HTF bias + 5m BOS/CHoCH + 1m BOS in same direction.
+    ev5 = mtf.recent_event("5m", max_bars_ago=6,
+                           kinds={StructureKind.BOS, StructureKind.CHOCH})
+    ev1 = mtf.recent_event("1m", max_bars_ago=3, kinds={StructureKind.BOS})
+    if ev5 and ev1 and ev5.direction == ev1.direction:
+        d = ev5.direction
+        if htf in ("unknown", "ranging") or (
+                (d == Direction.LONG and htf != "bearish")
+                or (d == Direction.SHORT and htf != "bullish")):
+            votes.append(Vote(d, 1.5,
+                              f"MTF stack: {ev5.kind.value} on 5m → BOS on 1m (aligned entry)",
+                              "ict_bos", is_trend_aligned=True))
+
+    return votes
+
+
 ALL_SETUPS = [trend_bias, opening_range, vwap_setups, key_levels,
-              ema_pullback, trend_continuation, momentum, patterns]
+              ema_pullback, trend_continuation, noise_momentum,
+              ict_structure, momentum, patterns]
 
 
 def collect_votes(ctx: MarketContext) -> list[Vote]:

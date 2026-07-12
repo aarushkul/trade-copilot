@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-from app.config import POINT_VALUE, Settings
+from app.config import POINT_VALUE, TICK_VALUE, Settings
 from app.engine.risk import CircuitBreaker
 from app.engine.session import to_et
 from app.models import Direction, Quote, Signal, SignalStatus
@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS signals (
     pnl_dollars REAL,
     pnl_r REAL,
     mfe_points REAL DEFAULT 0,
-    mae_points REAL DEFAULT 0
+    mae_points REAL DEFAULT 0,
+    source TEXT NOT NULL DEFAULT 'live'
 );
 CREATE INDEX IF NOT EXISTS idx_signals_day ON signals(day);
 """
@@ -51,16 +52,44 @@ CREATE INDEX IF NOT EXISTS idx_signals_day ON signals(day);
 
 class Journal:
     def __init__(self, db_path: str | Path, settings: Settings,
-                 breaker: CircuitBreaker):
+                 breaker: CircuitBreaker, source: str = "live"):
         self.settings = settings
         self.breaker = breaker
+        # 'live' or 'sim': one journal instance operates in one world, so sim
+        # test sessions can never pollute live stats or the circuit breaker.
+        self.source = source
         self.conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(signals)")}
+        if "source" not in cols:   # additive migration for pre-existing DBs
+            self.conn.execute("ALTER TABLE signals ADD COLUMN source TEXT "
+                              "NOT NULL DEFAULT 'live'")
+            self.conn.commit()
         self.open_signal: Optional[Signal] = None
         self._partial_banked: float = 0.0     # $ banked at T1 by the runner logic
         self._runner_stop: Optional[float] = None
         self.on_update: Optional[Callable[[Signal], None]] = None
+        self._recover_state()
+
+    def _recover_state(self) -> None:
+        """Startup hygiene after a restart.
+
+        1. Signals left OPEN/ACTIVE by a previous run can't be tracked honestly
+           any more -> mark EXPIRED_UNFILLED (excluded from win-rate stats).
+        2. Re-seed the circuit breaker with today's stop-outs so a restart
+           cannot bypass the daily lockout.
+        """
+        self.conn.execute(
+            "UPDATE signals SET status = ? WHERE status IN ('OPEN', 'ACTIVE')",
+            (SignalStatus.EXPIRED_UNFILLED.value,))
+        self.conn.commit()
+        today = _day(time.time())
+        row = self.conn.execute(
+            "SELECT COUNT(*) FROM signals WHERE day = ? AND status = 'STOPPED' "
+            "AND source = ?", (today, self.source)).fetchone()
+        if row and row[0]:
+            self.breaker.seed(today, int(row[0]))
 
     # -- recording ------------------------------------------------------------
 
@@ -76,12 +105,14 @@ class Journal:
             """INSERT OR REPLACE INTO signals
                (id, ts, day, direction, grade, score, entry, stop, target1,
                 target2, contracts, risk_dollars, setup_type, reasons, status,
-                resolved_ts, exit_price, pnl_dollars, pnl_r, mfe_points, mae_points)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                resolved_ts, exit_price, pnl_dollars, pnl_r, mfe_points,
+                mae_points, source)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (s.id, s.ts, _day(s.ts), s.direction.value, s.grade.value, s.score,
              s.entry, s.stop, s.target1, s.target2, s.contracts, s.risk_dollars,
              s.setup_type, json.dumps(s.reasons), s.status.value, s.resolved_ts,
-             s.exit_price, s.pnl_dollars, s.pnl_r, s.mfe_points, s.mae_points))
+             s.exit_price, s.pnl_dollars, s.pnl_r, s.mfe_points, s.mae_points,
+             self.source))
         self.conn.commit()
 
     # -- live tracking -----------------------------------------------------------
@@ -103,34 +134,38 @@ class Journal:
         t1_hit = (price >= s.target1) if sign == 1 else (price <= s.target1)
         t2_hit = (price >= s.target2) if sign == 1 else (price <= s.target2)
 
+        # P&L is computed from actual exit prices (not assumed R multiples),
+        # so the journal stays honest under any bracket geometry.
+        def pts(price_out: float) -> float:
+            return (price_out - s.entry) * sign * POINT_VALUE
+
         if self._runner_stop is None:
             # Phase 1: full position, watching stop vs target 1.
             if stop_hit:
                 self._resolve(q.ts, SignalStatus.STOPPED, stop,
-                              pnl=-s.risk_dollars)
+                              pnl=s.contracts * pts(stop))
                 return
             if t1_hit:
-                r_per_contract = s.stop_points * POINT_VALUE
                 if s.contracts == 1:
                     self._resolve(q.ts, SignalStatus.TARGET1, s.target1,
-                                  pnl=r_per_contract)
+                                  pnl=pts(s.target1))
                     return
                 # Bank half at T1, run the rest with stop at breakeven.
                 half = s.contracts // 2 or 1
-                self._partial_banked = half * r_per_contract
+                self._partial_banked = half * pts(s.target1)
                 self._runner_stop = s.entry
                 self._touch(s)
         else:
             # Phase 2: runner active with breakeven stop.
             runner = s.contracts - (s.contracts // 2 or 1)
-            r_per_contract = s.stop_points * POINT_VALUE
             if t2_hit:
                 self._resolve(q.ts, SignalStatus.TARGET2, s.target2,
-                              pnl=self._partial_banked + runner * 2 * r_per_contract)
+                              pnl=self._partial_banked + runner * pts(s.target2))
                 return
             if stop_hit:
-                self._resolve(q.ts, SignalStatus.FLAT_EXIT, s.entry,
-                              pnl=self._partial_banked)
+                self._resolve(q.ts, SignalStatus.FLAT_EXIT, self._runner_stop,
+                              pnl=self._partial_banked
+                                  + runner * pts(self._runner_stop))
                 return
 
         # Timeout or session end -> flat exit at market.
@@ -150,7 +185,7 @@ class Journal:
         s.status = status
         s.resolved_ts = ts
         s.exit_price = round(exit_price, 2)
-        s.pnl_dollars = round(pnl, 2)
+        s.pnl_dollars = round(pnl - self._friction(s, status), 2)
         s.pnl_r = round(pnl / s.risk_dollars, 2) if s.risk_dollars else 0.0
         if status == SignalStatus.STOPPED:
             self.breaker.record_stop_out(_day(ts))
@@ -160,6 +195,22 @@ class Journal:
         self._partial_banked = 0.0
         self._touch(s)
 
+    def _friction(self, s: Signal, status: SignalStatus) -> float:
+        """Commissions + slippage for the whole round trip, in dollars.
+
+        Entries and stop/flat exits are market-order fills (slip against you);
+        target fills are resting limits (no slip modeled).
+        """
+        commissions = s.contracts * 2 * self.settings.commission_per_side
+        slip_per_fill = self.settings.slippage_ticks * TICK_VALUE
+        market_fills = s.contracts  # entry legs
+        if status == SignalStatus.STOPPED:
+            market_fills += s.contracts
+        elif status == SignalStatus.FLAT_EXIT:
+            runner = s.contracts - (s.contracts // 2 or 1)
+            market_fills += runner if self._runner_stop is not None else s.contracts
+        return commissions + market_fills * slip_per_fill
+
     def _touch(self, s: Signal) -> None:
         if self.on_update:
             self.on_update(s)
@@ -168,15 +219,20 @@ class Journal:
 
     def recent(self, n: int = 50) -> list[dict]:
         rows = self.conn.execute(
-            "SELECT * FROM signals ORDER BY ts DESC LIMIT ?", (n,)).fetchall()
+            "SELECT * FROM signals WHERE source = ? ORDER BY ts DESC LIMIT ?",
+            (self.source, n)).fetchall()
         return [_row_to_dict(r) for r in rows]
 
     def stats(self, day: Optional[str] = None) -> dict:
-        where, params = ("WHERE day = ?", (day,)) if day else ("", ())
+        where, params = (("WHERE source = ? AND day = ?", (self.source, day))
+                         if day else ("WHERE source = ?", (self.source,)))
         rows = self.conn.execute(
             f"SELECT status, pnl_dollars, pnl_r, setup_type FROM signals {where}",
             params).fetchall()
-        resolved = [r for r in rows if r["status"] not in ("ACTIVE", "OPEN")]
+        # EXPIRED_UNFILLED = never tracked (e.g. orphaned by a restart) - it has
+        # no honest outcome, so it must not dilute or pad the win rate.
+        resolved = [r for r in rows
+                    if r["status"] not in ("ACTIVE", "OPEN", "EXPIRED_UNFILLED")]
         wins = [r for r in resolved if r["status"] in ("TARGET1", "TARGET2")]
         losses = [r for r in resolved if r["status"] == "STOPPED"]
         pnl = sum(r["pnl_dollars"] or 0 for r in resolved)

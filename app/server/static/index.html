@@ -30,11 +30,31 @@
     <div class="stat"><label>Win rate</label><span id="stat-wr">—</span></div>
     <div class="stat"><label>Signals</label><span id="stat-count">0</span></div>
   </div>
-  <button id="settings-btn" title="Settings">⚙</button>
+  <div class="topbar-actions">
+    <button id="stop-btn" type="button" title="Stop Trade Copilot">Stop</button>
+    <button id="settings-btn" type="button" title="Settings">⚙</button>
+  </div>
 </header>
+
+<div id="stopped-overlay" class="hidden">
+  <div class="stopped-card">
+    <h2>Trade Copilot stopped</h2>
+    <p>The engine and dashboard are off. To trade again, double-click
+      <strong>Start Trade Copilot.command</strong> in your
+      <code>trade-copilot</code> folder (or run <code>./start.sh</code>).</p>
+  </div>
+</div>
 
 <div id="breaker-banner" class="hidden">
   CIRCUIT BREAKER — <span id="breaker-text">2 stop-outs today. Done for the day. Protect the account.</span>
+</div>
+
+<div id="displacement-banner" class="hidden">
+  ⚡ ABNORMAL MOVE — <span id="displacement-text"></span>
+</div>
+
+<div id="levels-break-banner" class="hidden">
+  📌 LEVELS BREAK — <span id="levels-break-text"></span>
 </div>
 
 <main>
@@ -65,6 +85,16 @@
         </div>
         <div class="sc-ttl" id="sc-ttl"></div>
         <ul class="sc-reasons" id="sc-reasons"></ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Market structure <span class="muted" id="struct-htf">—</span></h3>
+      <div id="struct-grid" class="struct-grid">
+        <div class="struct-row"><span>1h</span><span id="st-1h">—</span></div>
+        <div class="struct-row"><span>15m</span><span id="st-15m">—</span></div>
+        <div class="struct-row"><span>5m</span><span id="st-5m">—</span></div>
+        <div class="struct-row"><span>1m</span><span id="st-1m">—</span></div>
       </div>
     </div>
 

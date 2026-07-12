@@ -108,3 +108,20 @@ has been given the honest counter-evidence at each step. Prefers
 measurements over opinions; approved the pre-registered protocol; the
 decisive framings that landed: winrate ≠ expectancy, look budgets as
 one-shot resources, friction toll per trade, variance vs edge (gambling).
+
+## Selectivity mode (2026-07-12, live config)
+
+User direction: 1-2 trades/day max, 0 is fine. Implemented from the
+research evidence (every entry pays 0.03-0.13 R; worst at 09:30-10:00 and
+15:00+; ict_bos was the fitted OOS carrier):
+- `a_grade_only=true` (B-grade = context, never a call)
+- `daily_signal_cap=2`; zero-signal days are expected
+- entry window 10:00-15:00 ET (`no_open_minutes=30`, `last_entry_minutes=60`)
+- TRIGGER_TAGS = {pullback, orb} (ict_bos demoted to confluence)
+- levels-break advisory banner (the 7-year-persistent pattern; never a call)
+- sizing/breaker UNCHANGED — "one large trade" was requested; size was NOT
+  increased because no positive-expectancy signal exists to size up
+Measured behavior: 25-session tape 0.3 calls/day (was 4.8); walk-forward
+week 1 call (was 10). In-sample P&L on 8 calls is noise — do not sell it.
+Settings live in data/settings.json; the app needs a restart to load the
+new engine code (./start.sh or the desktop .command).

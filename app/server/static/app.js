@@ -4,13 +4,22 @@
 
   // ---------- chart ----------
   const chartEl = document.getElementById("chart");
+  // Render all chart times in ET (the tape's clock); the library defaults to UTC.
+  const etTime = (ts) => new Date(ts * 1000).toLocaleTimeString("en-US",
+    { timeZone: "America/New_York", hour12: false, hour: "2-digit", minute: "2-digit" });
   const chart = LightweightCharts.createChart(chartEl, {
     layout: { background: { color: "#0d1117" }, textColor: "#8b949e" },
     grid: {
       vertLines: { color: "rgba(45,51,59,0.4)" },
       horzLines: { color: "rgba(45,51,59,0.4)" },
     },
-    timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#2d333b" },
+    timeScale: {
+      timeVisible: true, secondsVisible: false, borderColor: "#2d333b",
+      tickMarkFormatter: (ts, type) => type >= 3 ? etTime(ts)
+        : new Date(ts * 1000).toLocaleDateString("en-US",
+          { timeZone: "America/New_York", month: "short", day: "numeric" }),
+    },
+    localization: { timeFormatter: (ts) => etTime(ts) + " ET" },
     rightPriceScale: { borderColor: "#2d333b" },
     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
   });
@@ -89,6 +98,28 @@
   let lastPrice = null;
   let activeSignal = null;
   let ttlTimer = null;
+  let lastBarTime = 0;
+
+  // lightweight-charts throws (and blanks the series) on non-ascending
+  // times, so sanitize snapshots and drop stale updates instead of crashing.
+  function setChartData(bars) {
+    const clean = [];
+    bars.slice().sort((a, b) => a.time - b.time).forEach((b) => {
+      if (clean.length && clean[clean.length - 1].time === b.time) {
+        clean[clean.length - 1] = b;         // keep the freshest duplicate
+      } else {
+        clean.push(b);
+      }
+    });
+    candles.setData(clean);
+    lastBarTime = clean.length ? clean[clean.length - 1].time : 0;
+  }
+
+  function updateChartBar(bar) {
+    if (bar.time < lastBarTime) return;      // stale/out-of-order: ignore
+    candles.update(bar);
+    lastBarTime = bar.time;
+  }
 
   function setSignalCard(sig, standAsideReason) {
     const card = $("signal-card");
@@ -194,6 +225,27 @@
     });
   }
 
+  function renderStructure(st) {
+    if (!st) return;
+    const htf = st.htf_bias || "unknown";
+    $("struct-htf").textContent = "HTF bias: " + htf;
+    for (const tf of ["1h", "15m", "5m", "1m"]) {
+      const el = $("st-" + tf);
+      const row = st[tf];
+      if (!el || !row) continue;
+      let txt = row.bias;
+      if (row.last_event) {
+        const ev = row.last_event;
+        txt += " · " + ev.kind + " " + ev.direction + " @ " + ev.level;
+        if (ev.bars_ago === 0) txt += " (now)";
+        else if (ev.bars_ago <= 3) txt += " (" + ev.bars_ago + " bars ago)";
+      }
+      el.textContent = txt;
+      el.className = row.bias === "bullish" ? "struct-bull"
+        : row.bias === "bearish" ? "struct-bear" : "struct-range";
+    }
+  }
+
   function applyState(st) {
     if (!st || !st.price) return;
     const priceEl = $("price");
@@ -220,6 +272,12 @@
       setLine("VWAP-2", st.vwap - 2 * st.vwap_sigma, "rgba(210,153,34,0.5)",
         LightweightCharts.LineStyle.Dotted, "-2σ");
     }
+    // Time-of-day noise band: beyond it = statistically abnormal displacement
+    // (trend-day evidence); inside it = normal wander, breakouts carry no edge.
+    setLine("NOISE+", st.noise_upper, "rgba(63,185,80,0.55)",
+      LightweightCharts.LineStyle.SparseDotted, "noise+");
+    setLine("NOISE-", st.noise_lower, "rgba(248,81,73,0.55)",
+      LightweightCharts.LineStyle.SparseDotted, "noise-");
     if (st.levels) {
       const L = st.levels;
       setLine("PDH", L.prior_day_high, "#8b949e", LightweightCharts.LineStyle.Dashed, "PDH");
@@ -233,6 +291,7 @@
     }
 
     renderVotes(st.votes);
+    renderStructure(st.structure);
     $("chop-line").textContent = st.chop ? "⚠ " + st.chop_detail : (st.chop_detail || "");
 
     const banner = $("breaker-banner");
@@ -244,6 +303,41 @@
       banner.classList.add("hidden");
     }
 
+    // Advisory-only: the engine saw an abnormal bar and is standing aside on
+    // purpose (chasing these measured net-negative over 25 real sessions).
+    const dispBanner = $("displacement-banner");
+    if (st.displacement) {
+      const d = st.displacement;
+      const ageMin = Math.floor(Math.max(0, st.ts - d.ts - 60) / 60);
+      dispBanner.classList.remove("hidden");
+      $("displacement-text").textContent =
+        fmt(d.points, 0) + "-pt 1m bar (" + d.atr_mult + "x ATR) on " +
+        fmt(d.rvol, 1) + "x volume, heavy " +
+        (d.direction === "SELL" ? "selling" : "buying") +
+        (ageMin >= 1 ? ", " + ageMin + "m ago" : "") +
+        ". Momentum regime — don't fade it; wait for a confirmed setup.";
+    } else {
+      dispBanner.classList.add("hidden");
+    }
+
+    // Advisory-only: the one pattern that persisted across the 2019-2026
+    // research corpus (PF 2.17, t 2.9) but is UNVALIDATED at ~10 events/yr.
+    // Context for the discretionary trader; the engine never trades it.
+    const lvlBanner = $("levels-break-banner");
+    if (st.levels_break) {
+      const lb = st.levels_break;
+      const ageMin = Math.floor(Math.max(0, st.ts - lb.ts) / 60);
+      lvlBanner.classList.remove("hidden");
+      $("levels-break-text").textContent =
+        lb.level + " " + fmt(lb.px, 2) + " broken " +
+        (lb.direction === "BUY" ? "upward" : "downward") + " by " +
+        fmt(lb.through_pts, 1) + " pts after an approach from distance" +
+        (ageMin >= 1 ? ", " + ageMin + "m ago" : "") +
+        ". Rare 7-year-persistent pattern; unvalidated — context, not a call.";
+    } else {
+      lvlBanner.classList.add("hidden");
+    }
+
     activeSignal = st.open_signal || activeSignal;
     if (st.open_signal) setSignalCard(st.open_signal, null);
     else if (!activeSignal || ["TARGET1", "TARGET2", "STOPPED", "FLAT_EXIT", "EXPIRED_UNFILLED"]
@@ -251,6 +345,29 @@
       setSignalCard(null, st.standing_aside);
     }
   }
+
+  // ---------- stop server ----------
+  let intentionalShutdown = false;
+
+  function showStoppedOverlay() {
+    $("stopped-overlay").classList.remove("hidden");
+    document.title = "Trade Copilot — stopped";
+  }
+
+  async function stopCopilot() {
+    if (!confirm("Stop Trade Copilot?\n\nThe engine will shut down and this dashboard will go offline.")) {
+      return;
+    }
+    intentionalShutdown = true;
+    $("stop-btn").disabled = true;
+    $("feed-label").textContent = "stopping…";
+    try {
+      await fetch("/api/shutdown", { method: "POST" });
+    } catch (e) { /* server may exit before the response finishes */ }
+    showStoppedOverlay();
+  }
+
+  $("stop-btn").onclick = stopCopilot;
 
   // ---------- settings modal ----------
   const modal = $("settings-modal");
@@ -289,6 +406,11 @@
 
     ws.onopen = () => { dot.className = "dot live"; $("feed-label").textContent = "live"; };
     ws.onclose = () => {
+      if (intentionalShutdown) {
+        dot.className = "dot stale";
+        $("feed-label").textContent = "stopped";
+        return;
+      }
       dot.className = "dot stale";
       $("feed-label").textContent = "reconnecting…";
       setTimeout(connect, 2000);
@@ -298,12 +420,12 @@
       if (msg.type === "init") {
         settings = msg.settings || {};
         $("symbol").textContent = msg.symbol + "  ·  " + msg.feed_mode + " feed";
-        if (msg.bars_1m && msg.bars_1m.length) candles.setData(msg.bars_1m);
+        if (msg.bars_1m && msg.bars_1m.length) setChartData(msg.bars_1m);
         renderHistory(msg.signals || []);
         renderStats(msg.stats_today, msg.stats_all);
         if (msg.state && msg.state.price) applyState(msg.state);
       } else if (msg.type === "bar") {
-        candles.update(msg.bar);
+        updateChartBar(msg.bar);
       } else if (msg.type === "state") {
         applyState(msg);
       } else if (msg.type === "signal") {
@@ -328,6 +450,11 @@
         }
       } else if (msg.type === "settings") {
         settings = msg.settings;
+      } else if (msg.type === "shutdown") {
+        intentionalShutdown = true;
+        $("stop-btn").disabled = true;
+        $("feed-label").textContent = "stopped";
+        showStoppedOverlay();
       }
     };
   }

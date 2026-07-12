@@ -59,14 +59,46 @@ body {
 .day-stats { display: flex; gap: 18px; margin-left: auto; }
 .stat label { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; }
 .stat span { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
-#settings-btn {
+.topbar-actions { display: flex; gap: 8px; align-items: center; }
+.topbar-actions button {
   background: var(--panel2);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 13px;
   padding: 6px 12px;
   cursor: pointer;
+}
+.topbar-actions button:hover:not(:disabled) { filter: brightness(1.08); }
+.topbar-actions button:disabled { opacity: 0.5; cursor: default; }
+#settings-btn { font-size: 16px; }
+#stop-btn {
+  color: #ffd7d5;
+  border-color: rgba(248, 81, 73, 0.5);
+  background: rgba(218, 54, 51, 0.15);
+  font-weight: 600;
+}
+
+#stopped-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(13, 17, 23, 0.92);
+  display: flex; align-items: center; justify-content: center;
+}
+.stopped-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 32px;
+  max-width: 420px;
+  text-align: center;
+}
+.stopped-card h2 { font-size: 20px; margin-bottom: 10px; }
+.stopped-card p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+.stopped-card code {
+  background: var(--panel2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 
 /* ---------- breaker banner ---------- */
@@ -78,6 +110,28 @@ body {
   font-weight: 700;
   letter-spacing: 0.5px;
   border-bottom: 1px solid var(--red);
+}
+
+/* ---------- displacement banner (advisory, not a signal) ---------- */
+#displacement-banner {
+  background: linear-gradient(90deg, #4a3200, #6b4a00);
+  color: #ffe0a3;
+  text-align: center;
+  padding: 7px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #d29922;
+}
+
+/* ---------- levels-break banner (advisory context, not a signal) ---------- */
+#levels-break-banner {
+  background: linear-gradient(90deg, #0b3a2e, #0e5240);
+  color: #a9f0d1;
+  text-align: center;
+  padding: 7px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #2ea87e;
 }
 
 /* ---------- layout ---------- */
@@ -149,6 +203,13 @@ main { display: flex; flex: 1; min-height: 0; }
   padding: 12px 14px;
 }
 .panel h3 { font-size: 13px; margin-bottom: 8px; }
+.struct-grid { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.struct-row { display: flex; justify-content: space-between; gap: 8px; }
+.struct-row span:first-child { color: var(--muted); min-width: 28px; }
+.struct-row span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.struct-bull { color: var(--green-bright); }
+.struct-bear { color: var(--red-bright); }
+.struct-range { color: var(--amber); }
 .muted { color: var(--muted); font-size: 12px; }
 
 .votes { list-style: none; max-height: 180px; overflow-y: auto; }

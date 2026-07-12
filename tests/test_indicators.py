@@ -64,3 +64,25 @@ def test_patterns():
     hammer = Bar(0, 100, 100.4, 96, 100.1)        # long lower wick
     assert is_bullish_pin(hammer)
     assert not is_bearish_pin(hammer)
+
+
+def test_bar_series_resumes_seeded_partial_bar():
+    """Seeded history (e.g. Schwab) includes the current partial minute.
+    The first live quote must resume that bar, not create a duplicate
+    timestamp - duplicates blank the chart and double-count indicators."""
+    from app.feed.bars import BarSeries
+    from app.models import Quote
+
+    s = BarSeries(60)
+    s.seed([Bar(0, 100, 101, 99, 100, 50),
+            Bar(60, 100, 102, 100, 101, 30)])   # partial current minute
+    s.on_quote(Quote(ts=75, last=103, last_size=5))   # same minute as seed tail
+    assert len(s.bars) == 1                     # partial bar popped into forming
+    assert s.forming.ts == 60
+    assert s.forming.high == 103 and s.forming.low == 100
+    assert s.forming.volume == 35
+
+    s.on_quote(Quote(ts=121, last=104, last_size=1))  # next minute closes it
+    times = [b.ts for b in s.bars]
+    assert times == sorted(set(times))          # strictly ascending, no dupes
+    assert s.bars[-1].ts == 60 and s.bars[-1].close == 103

@@ -6,13 +6,11 @@ whole time you wait — no credentials needed.
 
 ## 0. Run it right now (demo mode)
 
-```bash
-cd ~/Projects/trade-copilot
-.venv/bin/python run.py
-```
+**Double-click `Start Trade Copilot.command`** in Finder (or run `./start.sh`).
+Your browser opens to http://127.0.0.1:8000 automatically.
 
-Open http://127.0.0.1:8000. You'll see a simulated MNQ tape with live signals —
-this is for getting familiar with the dashboard, not for trading.
+Click **Stop** on the dashboard when you're done. The app uses a simulated MNQ
+feed until Schwab is set up (`--feed auto` picks Schwab once credentials exist).
 
 ## 1. Open a Schwab brokerage account (~15 min)
 
@@ -35,8 +33,8 @@ this is for getting familiar with the dashboard, not for trading.
 
 ## 3. Configure credentials (~2 min)
 
-Once the app is Ready for Use, open it in the developer portal and copy the
-**App Key** and **App Secret**:
+Once the app is Ready for Use, copy **App Key** and **App Secret** into
+**`.env`** (not `.env.example` — the example file is only a template):
 
 ```bash
 cd ~/Projects/trade-copilot
@@ -44,7 +42,7 @@ cp .env.example .env
 # edit .env and paste your key + secret
 ```
 
-`.env` stays on your machine (it's gitignored).
+`.env` is gitignored and stays on your machine only.
 
 ## 4. One-time account link (~2 min)
 
@@ -59,6 +57,11 @@ A browser opens → log into Schwab → click **Allow**. The token saves to
 > auth, just re-run this script.
 
 ## 5. Go live
+
+Double-click **`Start Trade Copilot.command`** (or `./start.sh`). With `.env`
+configured, `--feed auto` uses Schwab automatically.
+
+Or explicitly:
 
 ```bash
 .venv/bin/python run.py --feed schwab

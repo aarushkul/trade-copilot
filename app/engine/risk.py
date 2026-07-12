@@ -4,8 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from app.config import POINT_VALUE, Settings
+from app.config import POINT_VALUE, TICK_SIZE, Settings
 from app.models import Direction, Grade
+
+
+def round_tick(price: float) -> float:
+    """Snap a price to the instrument's tick grid."""
+    return round(round(price / TICK_SIZE) * TICK_SIZE, 2)
 
 
 @dataclass
@@ -43,12 +48,12 @@ def build_trade_plan(direction: Direction, grade: Grade, entry: float,
 
     risk_dollars = contracts * risk_per_contract
     sign = 1 if direction == Direction.LONG else -1
-    stop = entry - sign * stop_points
-    target1 = entry + sign * stop_points          # 1R
-    target2 = entry + sign * stop_points * 2      # 2R
+    entry = round_tick(entry)
+    stop = round_tick(entry - sign * stop_points)
+    target1 = round_tick(entry + sign * stop_points)      # 1R
+    target2 = round_tick(entry + sign * stop_points * settings.target2_r)
     return RiskDecision(TradePlan(
-        entry=round(entry, 2), stop=round(stop, 2),
-        target1=round(target1, 2), target2=round(target2, 2),
+        entry=entry, stop=stop, target1=target1, target2=target2,
         contracts=contracts, risk_dollars=round(risk_dollars, 2),
         stop_points=round(stop_points, 2)))
 
@@ -69,6 +74,12 @@ class CircuitBreaker:
     def record_stop_out(self, day: str) -> None:
         self.on_new_day(day)
         self._losses += 1
+
+    def seed(self, day: str, losses: int) -> None:
+        """Restore today's loss count (e.g. from the journal after a restart),
+        so restarting the app cannot bypass the lockout."""
+        self.on_new_day(day)
+        self._losses = max(self._losses, losses)
 
     @property
     def losses_today(self) -> int:

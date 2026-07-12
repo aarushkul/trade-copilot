@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import asyncio
 import calendar
+import json
 import logging
 import time
 from datetime import date, datetime, timedelta
 from typing import Callable, Optional
 
-from app.config import TOKEN_FILE, SchwabCredentials
+from app.config import HISTORY_DIR, TOKEN_FILE, SchwabCredentials
 from app.models import Bar, Quote
 
 log = logging.getLogger("schwab_feed")
@@ -57,8 +58,10 @@ class SchwabFeed:
     def __init__(self, creds: SchwabCredentials):
         self.creds = creds
         self.symbol = front_month_symbol()
+        self.cache_file = HISTORY_DIR / "warmup_cache.json"
         self._client = None
         self._last_quote_ts = 0.0
+        self._prev_day_volume = 0
         self._running = False
 
     # -- client -----------------------------------------------------------------
@@ -77,23 +80,73 @@ class SchwabFeed:
     # -- history -----------------------------------------------------------------
 
     def fetch_history(self, days: int = 10) -> list[Bar]:
-        """Recent 1m bars for indicator warm-up. Empty list on failure."""
+        """Recent 1m bars for indicator warm-up.
+
+        Fetched in <=10-day chunks (each retried once): long single requests
+        and token-refresh races can fail transiently, and a silent cold start
+        costs the engine ~2 hours of "warming up indicators" plus the whole
+        noise-band lookback. Successful fetches are cached to disk; if the API
+        returns nothing, the last cache is used so a restart still warms up.
+        """
+        bars_by_ts: dict[float, Bar] = {}
         try:
             client = self._client or self._make_client()
             end = datetime.now()
-            start = end - timedelta(days=days)
-            resp = client.get_price_history_every_minute(
-                self.symbol, start_datetime=start, end_datetime=end,
-                need_extended_hours_data=True)
-            resp.raise_for_status()
-            candles = resp.json().get("candles", [])
-            bars = [Bar(c["datetime"] / 1000.0, c["open"], c["high"],
-                        c["low"], c["close"], int(c.get("volume", 0)))
-                    for c in candles]
+            remaining = days
+            while remaining > 0:
+                span = min(10, remaining)
+                start = end - timedelta(days=span)
+                for attempt in (1, 2):
+                    try:
+                        resp = client.get_price_history_every_minute(
+                            self.symbol, start_datetime=start, end_datetime=end,
+                            need_extended_hours_data=True)
+                        resp.raise_for_status()
+                        for c in resp.json().get("candles", []):
+                            ts = c["datetime"] / 1000.0
+                            bars_by_ts[ts] = Bar(ts, c["open"], c["high"], c["low"],
+                                                 c["close"], int(c.get("volume", 0)))
+                        break
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning("history chunk %s..%s attempt %d failed: %s",
+                                    start.date(), end.date(), attempt, exc)
+                        time.sleep(1.0)
+                end = start
+                remaining -= span
+        except Exception as exc:  # noqa: BLE001 - feed must never crash the app
+            log.warning("history fetch failed (%s)", exc)
+
+        bars = [bars_by_ts[t] for t in sorted(bars_by_ts)]
+        if bars:
+            self._save_cache(bars)
             log.info("history warm-up: %d 1m bars for %s", len(bars), self.symbol)
             return bars
-        except Exception as exc:  # noqa: BLE001 - feed must never crash the app
-            log.warning("history fetch failed (%s); warming from live only", exc)
+        cached = self._load_cache()
+        if cached:
+            age_min = (time.time() - cached[-1].ts) / 60.0
+            log.warning("history fetch empty - warming from cache "
+                        "(%d bars, %.0f min stale)", len(cached), age_min)
+        else:
+            log.warning("no history and no cache; warming from live only")
+        return cached
+
+    def _save_cache(self, bars: list[Bar]) -> None:
+        try:
+            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+            self.cache_file.write_text(json.dumps(
+                {"symbol": self.symbol, "bars": [b.to_dict() for b in bars]}))
+        except OSError as exc:
+            log.warning("could not write warm-up cache: %s", exc)
+
+    def _load_cache(self) -> list[Bar]:
+        try:
+            raw = json.loads(self.cache_file.read_text())
+            if raw.get("symbol") != self.symbol:  # stale contract after roll
+                return []
+            return [Bar(b["time"], b["open"], b["high"], b["low"],
+                        b["close"], int(b.get("volume", 0)))
+                    for b in raw.get("bars", [])]
+        except (OSError, ValueError, KeyError):
             return []
 
     # -- live stream ---------------------------------------------------------------
@@ -117,12 +170,20 @@ class SchwabFeed:
                             continue
                         bid = _field(item, "BID_PRICE", "1") or 0.0
                         ask = _field(item, "ASK_PRICE", "2") or 0.0
-                        size = _field(item, "LAST_SIZE", "9") or 0
-                        vol = _field(item, "TOTAL_VOLUME", "8") or 0
+                        size = int(_field(item, "LAST_SIZE", "9") or 0)
+                        vol = int(_field(item, "TOTAL_VOLUME", "8") or 0)
+                        # The level-one stream conflates ticks, so LAST_SIZE
+                        # undercounts traded volume. Use the cumulative-volume
+                        # delta when it's larger, so live bar volume (and rvol)
+                        # is comparable to the true volume in history bars.
+                        if vol > self._prev_day_volume > 0:
+                            size = max(size, vol - self._prev_day_volume)
+                        if vol > 0:
+                            self._prev_day_volume = vol
                         self._last_quote_ts = time.time()
                         on_quote(Quote(ts=self._last_quote_ts, last=float(last),
                                        bid=float(bid), ask=float(ask),
-                                       last_size=int(size), day_volume=int(vol)))
+                                       last_size=size, day_volume=vol))
 
                 stream.add_level_one_futures_handler(handler)
                 await stream.level_one_futures_subs([self.symbol])
