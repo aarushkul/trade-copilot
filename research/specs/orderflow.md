@@ -129,3 +129,23 @@ Decision rule, stated blind:
   bracket-horizon information; recommend NOT buying for this strategy
   class. (Rough toll math: ~1.25 pts round-trip cost vs ~25 pt 60m sigma
   needs corr ~0.05 at 1-sigma selectivity to break even.)
+
+## RESULT — horizon study, 2026-07-12 (run r-20260712-024054-8875dc2e)
+
+22 sessions, 8,378 RTH rows. Every cell ~zero: point estimates |corr| <=
+0.016 at ALL horizons (1/5/15/30/60m), every 95% session-block CI spans 0,
+and no CI admits the +0.05 toll-clearing threshold on the long side.
+
+Honest note on the positive control: as registered it FAILED — but it was
+mis-specified. corr(delta_1m, NEXT-minute return) is not what the
+literature guarantees; the guaranteed relation is CONTEMPORANEOUS impact,
+which this exact dataset shows at +0.686 (build_flow verify). The pipeline
+is therefore demonstrably sound end-to-end, and the study's meaning is the
+strong form of the null: flow's information is fully absorbed into price
+within the minute it occurs. Nothing is left for any later minute.
+
+**Decision per the registered rule: < 0.03 everywhere, CIs span 0 ->
+"flow carries no bracket-horizon information; recommend NOT buying" the
+full-year trades data for this strategy class.** Scope: >= 1-minute
+horizons; sub-minute flow trading is real but not accessible to this
+program (retail latency, per-minute bars, Schwab fills).

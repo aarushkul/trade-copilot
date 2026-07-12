@@ -41,3 +41,15 @@ a full-fidelity train pass exists.
 
 1,592 registered evaluations across three cycles. Zero survivors. All
 validation looks and the single holdout look remain unspent.
+
+## Follow-up: information-horizon study on the owned true-trades month (2026-07-12)
+
+User asked to extract the answer from data already owned before buying
+more. Result (22 sessions, 8,378 RTH rows, session-block bootstrap CIs):
+true NQ flow vs forward MNQ moves is ~ZERO at every horizon from 1 to 60
+minutes (all |corr| <= 0.016, all CIs span 0) while the contemporaneous
+correlation is +0.686 — i.e., flow moves price in the same minute and is
+fully priced by the minute's close. **Registered decision rule triggered:
+do NOT buy the $112 full-year trades data for this strategy class.** The
+order-flow hypothesis at >= 1m horizons is now closed at full fidelity,
+at zero additional cost.

@@ -35,7 +35,8 @@ context.
 | 2026-07-11 | Cycle 1: regime + tod studies (train) | regime dead 26/26; no positive tod bucket |
 | 2026-07-11 | Cycle 1: 4 rule families + ML (750 sessions) | 0/760 pass |
 | 2026-07-11 | Cycle 1b: same grids, train extended to 2019 (1,680 sessions) | 0/760 pass; vwap/trend near-misses collapsed; levels-break persists (PF 2.17, t 2.9, n=68 — fails only n≥150); ML PF 0.98 |
-| 2026-07-12 | Cycle 2: orderflow (NQ 1s tick-rule proxy, 2025) | 0/72; **proxy credibility gate FAILED (0.706 < 0.8)** → scoped "proxy too weak", NOT "order flow dead"; side decode verified (+0.686); full-fidelity test costs ~$122/yr vs ~$62 credits left |
+| 2026-07-12 | Cycle 2: orderflow (NQ 1s tick-rule proxy, 2025) | 0/72; proxy credibility gate FAILED (0.706 < 0.8) → scoped "proxy too weak" |
+| 2026-07-12 | Horizon study on owned TRUE-trades month (22 sessions) | flow→forward-return corr ~0 at ALL 1-60m horizons (contemporaneous +0.686) → **order flow at ≥1m horizons closed at full fidelity; registered rule: do NOT buy the $112 year** |
 
 ## The research protocol (binding, research/README.md)
 
@@ -92,10 +93,9 @@ ml, orderflow, ml_flow.
   ≥5-10×atr_1m approach). Persistent across 7 years but ~10 events/yr.
   A wider-event levels-v2 spec is legitimate ONLY if written and
   registered before any further data peeking.
-- Earmarked lead 2: order flow at FULL fidelity (true NQ trades,
-  ~$122/yr) — the proxy failed its credibility gate, so the hypothesis is
-  untested, not dead. Requires user-approved spend; staged rule in
-  research/specs/orderflow.md applies.
+- Order flow: CLOSED (2026-07-12 horizon study on true trades) — flow's
+  information is fully priced within its own minute; nothing at 1-60m
+  horizons. Do not re-buy trades data for this strategy class.
 - The live app (run.py, port 8000) stays up as the discipline layer; do
   not kill it during research work.
 - `.env` holds SCHWAB_* + DATABENTO_API_KEY — never print values.
