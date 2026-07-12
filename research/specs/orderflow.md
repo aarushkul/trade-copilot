@@ -96,3 +96,17 @@ windows 0.74-0.76). Rules 0/40 (best PF 1.12), ml-v2 0/32 (best PF 1.06).
 Side decode verified correct (+0.686). Order flow remains UNTESTED at
 full fidelity; a real test costs ~$122/yr of trades data. See
 research/results/cycle2_orderflow.md.
+
+## Full-fidelity plan — registered 2026-07-12, BEFORE purchase or pull
+
+User-approved next step: buy true NQ trades for 2025-01-01 -> 2025-11-10
+(~$112; merges with the existing val-month trades file to cover the full
+train year). FLOW_VERSION bumps to 2 (features computed from TRUE aggressor
+delta; big-lot columns fl_big_delta/fl_big_imbalance restored since sizes
+exist). Evaluation: identical frozen rule sub-grids (orderflow-v2
+registration) and identical ml-v2 axes with monthly folds, same gates.
+The proxy-credibility gate is replaced by the side-decode check only
+(already PASSED on this exact data source). Staged rule stands: no
+validation look may be considered on flow results without a full-fidelity
+train pass first. This section written blind — no true-trades data beyond
+the already-validated month has been seen.
