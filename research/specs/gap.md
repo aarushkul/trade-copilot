@@ -22,7 +22,14 @@ evidence here (different question: classification freeze vs a trade rule).
 
 ## Event definition (one candidate entry per session per grid point)
 
-- open_bar = first bar with minute_et ≥ 570 (09:30 ET).
+- open_bar = first bar with minute_et in [570, 959] (09:30 ET).
+  [Clarified 2026-07-28 after run r-20260728-234818-490b4b52 returned
+  n=0 on all 288 points: research sessions begin 18:00 ET, so the
+  original "≥ 570" matched the Globex evening open (minute 1080) and no
+  signal ever landed in the entry window. Zero trades were produced, so
+  zero information was extracted; the run is VOID for implementation
+  fault and the identical frozen grid is re-registered. The 09:30 ET
+  intent was stated in this line from the start; nothing else changes.]
 - gap = pdc_dist_atr[open_bar] — the first RTH bar's close vs prior RTH
   close, in atr_5m units (feature-store column, causal). Not finite → no
   event (first session of corpus).

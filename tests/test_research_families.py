@@ -120,7 +120,7 @@ def _gap_session(pdc_path, on_prefix=30):
     n = n_on + len(pdc_path)
     close = np.full(n, 21000.0)
     pdc = np.concatenate([np.full(n_on, np.nan), np.asarray(pdc_path, float)])
-    minute = np.concatenate([np.arange(540, 540 + n_on, dtype=float),
+    minute = np.concatenate([np.arange(1080, 1080 + n_on, dtype=float),
                              np.arange(570, 570 + len(pdc_path), dtype=float)])
     return SessionData(
         bars=[None] * n,

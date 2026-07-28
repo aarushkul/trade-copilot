@@ -30,7 +30,8 @@ PARAMS_GRID = AXES
 COLUMNS = ["pdc_dist_atr", "atr_1m", "atr_5m", "rvol_1m", "minute_et"]
 
 UNFILLED_FLOOR = 0.5                  # fixed blind (spec)
-RTH_OPEN_MIN = 570
+RTH_OPEN_MIN, RTH_LAST_MIN = 570, 959  # sessions start 18:00 ET (Globex);
+                                       # the 09:30 open needs a range test
 
 
 def make_build(prep=None):
@@ -43,7 +44,8 @@ def make_build(prep=None):
             st = np.full(n, np.nan)
             pdc = d.f["pdc_dist_atr"]
             a5 = d.f["atr_5m"]
-            rth = np.flatnonzero(d.minute_et >= RTH_OPEN_MIN)
+            rth = np.flatnonzero((d.minute_et >= RTH_OPEN_MIN)
+                                 & (d.minute_et <= RTH_LAST_MIN))
             if len(rth):
                 o = int(rth[0])
                 gap = pdc[o]
