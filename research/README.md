@@ -157,3 +157,21 @@ decode verified (+0.686 delta-return corr). A full-fidelity test needs
 ~$122/yr of NQ trades data (~$62 credits remain) — a user spending
 decision. Program totals: 1,592 registered evaluations, zero survivors,
 all look budgets intact.
+
+## CYCLE 3 — new-hypothesis slate (registered 2026-07-28, running)
+
+User mandate 2026-07-28: continuous autonomous research under this
+protocol; authorities granted for autonomous data spend (≤ remaining
+credits), immediate validation-look spend on a genuine train pass, and
+auto paper-tracking on a validation pass. Holdout still requires explicit
+user sign-off. Slate: levels_v2, gap, compression, cross-market ES→NQ,
+exit-structure. Specs in research/specs/, each committed before its
+registration.
+
+**levels_v2 verdict (2026-07-28): 0/576, family CLOSED** — the widened
+universe scaled n exactly as designed (median 638 events at the 2.5×
+approach floor), and 44 points cleared PF/n/t simultaneously — but every
+one failed top-10 concentration (73–120% of net in ten trades). Levels
+P&L is outlier capture on a flat base, not a per-event edge; the
+"revisit with more data" earmark is downgraded accordingly. Details:
+research/results/cycle3_levels_v2.md.
