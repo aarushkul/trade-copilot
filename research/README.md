@@ -175,3 +175,18 @@ one failed top-10 concentration (73–120% of net in ten trades). Levels
 P&L is outlier capture on a flat base, not a per-event edge; the
 "revisit with more data" earmark is downgraded accordingly. Details:
 research/results/cycle3_levels_v2.md.
+
+**gap verdict (2026-07-28): 0/288, family CLOSED** (first run VOID for an
+implementation fault — n=0 everywhere, documented in the spec; the fixed
+identical grid is the counting run). Big-gap continuation carries PF
+1.27–1.32 at t≈3 on n=661–724 but fails months-positive and top-10
+concentration: gap-and-go is a trend-day subsample, not a daily edge.
+
+**compression verdict (2026-07-28): 0/288, family CLOSED** — best PF 1.10
+at t 0.7; coil breakouts are breakeven noise after costs.
+
+**Cycle-3 meta-finding:** MNQ 1m price patterns net of costs = breakeven
+base + rare trend-day outliers, measured now across four event
+archetypes. Remaining slate: cross-market ES→NQ, then a trend-day-harvest
+exit-structure spec (sim version bump for trailing exits), each
+registered blind. Details: research/results/cycle3_gap_compression.md.
