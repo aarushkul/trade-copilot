@@ -5,8 +5,8 @@ from __future__ import annotations
 from importlib import import_module
 
 FAMILY_NAMES = ("regime", "tod", "vwap_reversion", "orb",
-                "trend_continuation", "levels", "levels_v2", "gap", "ml",
-                "orderflow", "ml_flow")
+                "trend_continuation", "levels", "levels_v2", "gap",
+                "compression", "ml", "orderflow", "ml_flow")
 
 
 def get(name: str):

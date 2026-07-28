@@ -154,3 +154,64 @@ def test_gap_arms_direction_and_fill_filter():
     assert list(np.flatnonzero(m2["2024-01-08"][0])) == [45]  # long with gap
     m3, _, _, _, _ = build(data, {**base, "arm": "go", "gcap": 999})
     assert m3["2024-01-10"][0].any()                  # uncapped includes big
+
+
+# -------------------------------------------------------------- compression
+
+def _coil_session(n=120, coil_break_at=60, rth_range=10.0):
+    from app.research.families.common import SessionData
+    close = np.full(n, 21000.0)
+    high = close + rth_range / 2
+    low = close - rth_range / 2
+    if coil_break_at is not None:
+        high = close + 1.0
+        low = close - 1.0
+        close = close.copy()
+        close[coil_break_at:] = 21010.0
+        high = np.maximum(high, close + 1.0)
+        low = np.minimum(low, close - 1.0)
+    return SessionData(
+        bars=[None] * n,
+        open=close.copy(), high=high, low=low, close=close,
+        minute_et=np.arange(570, 570 + n, dtype=float),
+        f={"atr_1m": np.full(n, 2.0), "atr_5m": np.full(n, 8.0),
+           "rvol_1m": np.full(n, 2.0), "minute_et": None},
+    )
+
+
+def test_compression_break_stop_and_rearm():
+    from app.research.families import compression
+    assert families.get("compression").FAMILY == "compression"
+    data = {"2024-01-08": _coil_session()}
+    prep = compression._prep(data)
+    build = compression.make_build(prep)
+    p = {"nr_k": "none", "m": 20, "c": 1.5, "break_b": 0.0,
+         "window": "rth", "stop_s": 0.5, "target_r": 1.0}
+    m, s, _, _, _ = build(data, p)
+    sig_l, sig_s = m["2024-01-08"]
+    hits = list(np.flatnonzero(sig_l))
+    assert hits and hits[0] == 60                    # break bar
+    assert all(b - a >= 20 for a, b in zip(hits, hits[1:]))  # re-arm gap
+    assert not sig_s.any()
+    # stop = close - coilmin + 0.5*atr5 = 21010 - 20999 + 4 = 15
+    assert s["2024-01-08"][60] == pytest.approx(15.0)
+
+
+def test_compression_nr_conditioner_needs_k_priors():
+    from app.research.families import compression
+    # 4 wide-range priors then a narrow prior, then the coil session
+    data = {f"2024-01-0{i}": _coil_session(coil_break_at=None, rth_range=30.0)
+            for i in range(1, 5)}
+    data["2024-01-05"] = _coil_session(coil_break_at=None, rth_range=4.0)
+    data["2024-01-08"] = _coil_session()
+    prep = compression._prep(data)
+    assert 4 in prep["2024-01-08"]                   # narrow prior of last 4
+    assert 7 not in prep["2024-01-08"]               # only 5 priors exist
+    build = compression.make_build(prep)
+    p = {"nr_k": 7, "m": 20, "c": 1.5, "break_b": 0.0,
+         "window": "rth", "stop_s": 0.5, "target_r": 1.0}
+    m, _, _, _, _ = build(data, p)
+    assert not m["2024-01-08"][0].any()              # k=7 not qualified
+    p4 = {**p, "nr_k": 4}
+    m4, _, _, _, _ = build(data, p4)
+    assert m4["2024-01-08"][0].any()                 # k=4 qualified
