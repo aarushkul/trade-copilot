@@ -109,3 +109,48 @@ def test_levels_v2_touch_budget_and_stop_merge():
     m3, s3, _, _, _ = build(data, {**base, "levelset": "full", "touch_n": 2})
     assert list(np.flatnonzero(m3["2024-01-08"][1])) == [80]
     assert s3["2024-01-08"][80] == pytest.approx(6.0)   # ibl merge, min stop
+
+
+# ---------------------------------------------------------------------- gap
+
+def _gap_session(pdc_path, on_prefix=30):
+    """Overnight prefix then RTH bars; pdc_dist_atr follows pdc_path."""
+    from app.research.families.common import SessionData
+    n_on = on_prefix
+    n = n_on + len(pdc_path)
+    close = np.full(n, 21000.0)
+    pdc = np.concatenate([np.full(n_on, np.nan), np.asarray(pdc_path, float)])
+    minute = np.concatenate([np.arange(540, 540 + n_on, dtype=float),
+                             np.arange(570, 570 + len(pdc_path), dtype=float)])
+    return SessionData(
+        bars=[None] * n,
+        open=close.copy(), high=close + 1, low=close - 1, close=close,
+        minute_et=minute,
+        f={"pdc_dist_atr": pdc, "atr_1m": np.full(n, 2.0),
+           "atr_5m": np.full(n, 8.0), "rvol_1m": np.full(n, 2.0),
+           "minute_et": None},
+    )
+
+
+def test_gap_arms_direction_and_fill_filter():
+    from app.research.families import gap
+    assert families.get("gap").FAMILY == "gap"
+    up_unfilled = _gap_session([2.0] * 40)            # gap +2 atr, never fills
+    up_filled = _gap_session([2.0] + [0.3] * 39)      # fills fast
+    big = _gap_session([5.0] * 40)                    # beyond gcap 4.0
+    data = {"2024-01-08": up_unfilled, "2024-01-09": up_filled,
+            "2024-01-10": big}
+    base = {"gmin": 1.0, "gcap": 4.0, "delay": 15, "stop_s": 1.0,
+            "target_r": 1.0, "horizon": 60}
+    build = gap.make_build()
+    m, s, tr, hz, w = build(data, {**base, "arm": "fade"})
+    sig_l, sig_s = m["2024-01-08"]
+    assert list(np.flatnonzero(sig_s)) == [45]        # on_prefix 30 + delay 15
+    assert not sig_l.any()
+    assert s["2024-01-08"][45] == pytest.approx(8.0)  # 1.0 x atr5
+    assert not m["2024-01-09"][1].any()               # filled -> no signal
+    assert not m["2024-01-10"][1].any()               # gcap excludes
+    m2, _, _, _, _ = build(data, {**base, "arm": "go"})
+    assert list(np.flatnonzero(m2["2024-01-08"][0])) == [45]  # long with gap
+    m3, _, _, _, _ = build(data, {**base, "arm": "go", "gcap": 999})
+    assert m3["2024-01-10"][0].any()                  # uncapped includes big
