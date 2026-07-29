@@ -196,3 +196,14 @@ train corpus pulled under the registration ($8.51, fence physical:
 validation-window ES never pulled). Best PF 0.99 at t −0.1; ES→NQ
 extreme-divergence is fully priced at 1m, consistent with the cycle-2
 flow-horizon null. Details: research/results/cycle3_xmkt.md.
+
+**trend_harvest verdict (2026-07-29): 0/288, family CLOSED — CYCLE 3
+TERMINAL.** First sim-1.1 (trailing exits) family. Best point PF 1.20 on
+n=1,692 (t 2.5) is the only genuine broad drift ever measured here — and
+its top-10 share is 407% with 55% of months negative: trails AMPLIFY the
+outlier structure instead of spreading it. The slate is exhausted.
+Program lifetime: 21 pre-registered runs, 3,477 evaluated
+configurations, zero survivors; all validation looks and the holdout
+look UNSPENT, reserved for a future cycle with a genuinely new
+information source. Full terminal report:
+research/results/cycle3_trend_harvest_terminal.md.

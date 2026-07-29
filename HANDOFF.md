@@ -1,9 +1,10 @@
 # Trade Copilot — Project State & Handoff
 
-Last updated: 2026-07-12 (overnight). This file is the single-page context for
-anyone (human or AI) picking up the project. Deep details live in
-`research/README.md` (binding protocol), `research/results/*.md` (verdicts),
-`research/ledger.jsonl` (every registered evaluation), and the auto-memory.
+Last updated: 2026-07-29 (cycle-3 terminal). This file is the single-page
+context for anyone (human or AI) picking up the project. Deep details live
+in `research/README.md` (binding protocol), `research/results/*.md`
+(verdicts), `research/ledger.jsonl` (every registered evaluation), and the
+auto-memory.
 
 ## What this project is
 
@@ -11,32 +12,37 @@ Advisory-only day-trading copilot for MNQ (Micro Nasdaq futures): Schwab
 feed → 1m bars → signal engine → SQLite journal → FastAPI dashboard
 (http://127.0.0.1:8000). It never places trades. User trades manually in
 NinjaTrader with a ~$1,200 account. Start: `./start.sh` or the
-`Start Trade Copilot.command` icon.
+`Start Trade Copilot.command` icon. Schwab refresh tokens die every ~7
+days → `.venv/bin/python scripts/schwab_login.py` (interactive).
 
 ## The one-paragraph status
 
-**The signal engine has no edge, and that is now proven, not suspected.**
-The deployed engine measured PF 0.87 over 743 unseen-data trades (2026-07-10
-verdict → REAL MONEY OFF). The ground-up redesign research program
-(pre-registered protocol, cycles 1, 1b, 2) evaluated **1,592 registered
-configurations** — four rule families, an ML track, regime/time-of-day
-studies, and an order-flow family — across up to 1,680 training sessions
-(2019→2025). **Zero passed the pre-registered train gates.** All validation
-looks (2/family) and the single holdout look remain UNSPENT. No live
-signal-following. The app's remaining value is the discipline layer:
-position sizing, circuit breaker, journal, chop/stand-aside, levels/VWAP
-context.
+**No tradeable signal edge exists on MNQ 1m at retail costs — measured,
+not suspected: 21 pre-registered runs, 3,477 evaluated configurations
+(2019–2025, five cycles of families incl. ML, orderflow, cross-market ES,
+and trailing-exit structures), zero passed the pre-registered train
+gates.** The one genuine drift found (trend_harvest breakout + 4×ATR
+trail: PF 1.20, n=1,692, t 2.5) is lottery-shaped — top-10 trades = 407%
+of net, 55% of months negative — structurally incapable of weekly income.
+All validation looks and the single holdout look are UNSPENT, reserved
+for a future cycle with genuinely new information (different timescale or
+data, not this corpus re-mined). The app's standing value is the
+discipline layer: sizing, circuit breaker, journal, selectivity mode,
+levels/VWAP context. REAL MONEY OFF for signal-following.
 
 ## Verdict timeline (all in research/results/ + ledger)
 
 | date | what | verdict |
 |---|---|---|
 | 2026-07-10 | Old engine on 188 unseen Databento sessions | PF 0.87, −$4,103 → fitted air; real money off |
-| 2026-07-11 | Cycle 1: regime + tod studies (train) | regime dead 26/26; no positive tod bucket |
-| 2026-07-11 | Cycle 1: 4 rule families + ML (750 sessions) | 0/760 pass |
-| 2026-07-11 | Cycle 1b: same grids, train extended to 2019 (1,680 sessions) | 0/760 pass; vwap/trend near-misses collapsed; levels-break persists (PF 2.17, t 2.9, n=68 — fails only n≥150); ML PF 0.98 |
-| 2026-07-12 | Cycle 2: orderflow (NQ 1s tick-rule proxy, 2025) | 0/72; proxy credibility gate FAILED (0.706 < 0.8) → scoped "proxy too weak" |
-| 2026-07-12 | Horizon study on owned TRUE-trades month (22 sessions) | flow→forward-return corr ~0 at ALL 1-60m horizons (contemporaneous +0.686) → **order flow at ≥1m horizons closed at full fidelity; registered rule: do NOT buy the $112 year** |
+| 2026-07-11 | Cycle 1: regime/tod + 4 families + ML (750 sessions) | 0/760; regime dead 26/26 |
+| 2026-07-11 | Cycle 1b: train extended to 2019 (1,680 sessions) | 0/760; near-misses collapsed |
+| 2026-07-12 | Cycle 2: orderflow proxy + horizon study | 0/72 scoped "proxy weak"; flow priced within its minute at 1-60m |
+| 2026-07-28 | Cycle 3: levels_v2 (widened universe) | 0/576; 44 PF/n/t-passers ALL top10-concentrated → levels = outlier capture |
+| 2026-07-28 | Cycle 3: gap (first registration; 1 void run) | 0/288; big-gap GO PF 1.32/t 3.1 but month-lumpy + concentrated |
+| 2026-07-28 | Cycle 3: compression (NR/coil) | 0/288; breakeven noise |
+| 2026-07-29 | Cycle 3: xmkt ES→NQ divergence ($8.51 ES pull) | 0/64; PF ≤ 0.99 — coupled at 1m |
+| 2026-07-29 | Cycle 3: trend_harvest (sim-1.1 trails) — TERMINAL | 0/288; drift real (PF 1.20/t 2.5) but top10 = 407% |
 
 ## The research protocol (binding, research/README.md)
 
@@ -46,82 +52,68 @@ context.
 - Ledger (`research/ledger.jsonl`): registration BEFORE results, always.
 - Train gates: PF≥1.25, n≥150, ≥60% months positive, top-10-trade share
   <40%, session-bootstrap t≥2, PF>1.0 at 1.5× slippage, plateau rule.
-- Winrate is recorded, NEVER selected on (a 93.7%-WR config lost $3.1k).
-- sim-1 fills: next-bar entry, 1-tick trade-through limits, both-in-bar =
-  STOP, force-flat 15:59 ET, $0.74/side + 1 tick slip.
-- **Iron rules:** never evaluate before registering; never peek at
-  validation/holdout without consuming a ledger look; a wider/tweaked spec
-  is a NEW registration written blind.
+- Winrate is recorded, NEVER selected on. Specs are committed blind before
+  registration; a tweaked spec is a NEW registration.
+- Fill models: sim-1 (brackets) and sim-1.1 (stop-only ATR trail ratchet,
+  golden-tested) in `app/research/sim.py`.
 
-## Data assets (data/ is gitignored; files are immutable once pulled)
+## Data assets (data/ is gitignored; files immutable once pulled)
 
-- MNQ 1m per-contract: `data/history/oos_MNQ*.json` — 2019-05-06 → 2026-05-26
-  (Databento GLBX.MDP3, raw symbols, expiry−8d roll; NEVER continuous
-  symbology — measured divergence). Schwab tape covers ≥ 2026-05-27.
-- NQ flow proxy: `data/history/flow_NQ1s_2025.parquet` (per-minute tick-rule
-  buy/sell from 1s bars, 2025 train year) + `flow_NQtrades_val.parquet`
-  (one month of true aggressor trades for proxy validation).
-- Feature store: `data/research/features/v1/{split}.parquet` (~52 causal
-  cols, 2.49M rows); outcomes (fwd_* targets) and flow features in parallel
-  trees. Rebuild: `scripts/research/build_features.py`, `build_flow.py`.
-- Databento spend: ~$63 of ~$125 free credits (~$62 remain). Degraded-quality
-  days listed in research/README.md.
+- MNQ 1m per-contract: `data/history/oos_MNQ*.json` — 2019-05-06 →
+  2026-05-26 (Databento GLBX.MDP3, raw symbols, expiry−8d roll; NEVER
+  continuous symbology). Schwab tape covers ≥ 2026-05-27.
+- ES 1m per-contract TRAIN-ONLY: `data/history/xmkt_ES*.json` — 2019-05-06
+  → 2025-12-10. Validation-window ES deliberately never pulled (fence).
+- NQ flow proxy (2025) + one true-trades month: `data/history/flow_*`.
+- Feature store v1: `data/research/features/v1/{split}.parquet`.
+- Databento spend: ~$71 of ~$125 free credits (~$54 remain).
 
 ## Commands
 
 ```bash
-.venv/bin/python -m pytest tests/ -q                 # full suite
-.venv/bin/python scripts/research/build_features.py  # features+outcomes+verify
-.venv/bin/python scripts/research/build_flow.py      # flow store + proxy checks
-.venv/bin/python scripts/research/run_family.py --family <name>   # register+run
-.venv/bin/python scripts/research/retrain.py --extend # monthly learning loop
+.venv/bin/python -m pytest tests/ -q                 # full suite (105)
+.venv/bin/python scripts/research/run_family.py --family <name>  # register+run
+.venv/bin/python scripts/research/retrain.py --extend # monthly corpus refresh
 .venv/bin/python scripts/edge_report.py              # weekly journal report
 ```
 
 Families: regime, tod, vwap_reversion, orb, trend_continuation, levels,
-ml, orderflow, ml_flow.
+levels_v2, gap, compression, xmkt, trend_harvest, ml, orderflow, ml_flow.
+ALL CLOSED as of cycle-3 terminal.
 
 ## Standing decisions & guardrails
 
-- **No live signal-following** until something passes train → validation →
-  holdout → ≥15 paper sessions (Phases 4-6). Nothing has passed Phase 3.
-- The single holdout look is the most precious asset. Do not spend it
-  without a validated survivor and explicit user sign-off.
-- Old scratchpad OOS trade dumps must never be mined for "surviving
-  corners" — that re-commits winner's curse.
-- Earmarked lead 1: levels-break (break-through continuation after a
-  ≥5-10×atr_1m approach). Persistent across 7 years but ~10 events/yr.
-  A wider-event levels-v2 spec is legitimate ONLY if written and
-  registered before any further data peeking.
-- Order flow: CLOSED (2026-07-12 horizon study on true trades) — flow's
-  information is fully priced within its own minute; nothing at 1-60m
-  horizons. Do not re-buy trades data for this strategy class.
-- The live app (run.py, port 8000) stays up as the discipline layer; do
-  not kill it during research work.
-- `.env` holds SCHWAB_* + DATABENTO_API_KEY — never print values.
+- **No live signal-following.** Nothing has ever passed Phase 3. The
+  holdout look requires a validated survivor AND explicit user sign-off.
+- Look budgets are pristine and reserved for genuinely NEW information
+  (different timescale/data). Re-mining this corpus is forbidden —
+  registered aggregates only.
+- Levels earmark DOWNGRADED (2026-07-28): more data adds flat base plus
+  a few more outliers; any revival spec must argue reduced concentration.
+- Order flow ≥1m: CLOSED. Cross-market price structure ≥1m: CLOSED.
+  Sub-minute: untested, cost-prohibitive (~$122/yr per instrument).
+- The 2026-07-28 user authorities (auto data spend ≤ credits, auto
+  validation look on train pass, auto paper on validation pass) were
+  exercised within cycle 3 only; the cycle is over and the autonomous
+  loop is STOPPED. A new cycle needs a new user conversation.
+- Old scratchpad OOS dumps must never be mined; winner's-curse rules
+  stand. `.env` holds SCHWAB_* + DATABENTO_API_KEY — never print values.
+- The live app stays up as the discipline layer; don't kill it during
+  research.
 
 ## User context
 
-Aarush trades MNQ manually with ~$1,200; wants a profitable, learning
-system ("AI is too powerful to not be able to be a good day trader") and
-has been given the honest counter-evidence at each step. Prefers
-measurements over opinions; approved the pre-registered protocol; the
-decisive framings that landed: winrate ≠ expectancy, look budgets as
-one-shot resources, friction toll per trade, variance vs edge (gambling).
+Aarush trades MNQ manually with ~$1,200; goal framing 2026-07-28 was
+"+$500/week" — told honestly (measured): no validated edge does that at
+this account size, and the one real drift found is structurally
+lottery-shaped. User owns sizing/scaling decisions; the machine owns
+signal/exit research under the protocol. Decisive framings that landed:
+winrate ≠ expectancy, look budgets as one-shot resources, friction toll,
+variance vs edge.
 
-## Selectivity mode (2026-07-12, live config)
+## Selectivity mode (2026-07-12, live config — unchanged)
 
-User direction: 1-2 trades/day max, 0 is fine. Implemented from the
-research evidence (every entry pays 0.03-0.13 R; worst at 09:30-10:00 and
-15:00+; ict_bos was the fitted OOS carrier):
-- `a_grade_only=true` (B-grade = context, never a call)
-- `daily_signal_cap=2`; zero-signal days are expected
-- entry window 10:00-15:00 ET (`no_open_minutes=30`, `last_entry_minutes=60`)
-- TRIGGER_TAGS = {pullback, orb} (ict_bos demoted to confluence)
-- levels-break advisory banner (the 7-year-persistent pattern; never a call)
-- sizing/breaker UNCHANGED — "one large trade" was requested; size was NOT
-  increased because no positive-expectancy signal exists to size up
-Measured behavior: 25-session tape 0.3 calls/day (was 4.8); walk-forward
-week 1 call (was 10). In-sample P&L on 8 calls is noise — do not sell it.
-Settings live in data/settings.json; the app needs a restart to load the
-new engine code (./start.sh or the desktop .command).
+a_grade_only=true, daily_signal_cap=2, entries 10:00–15:00 ET, triggers
+{pullback, orb}, levels-break advisory banner (never a call), sizing and
+breaker unchanged. Settings in data/settings.json. Measured: ~0.3
+calls/day. Zero-signal days are expected and correct.
