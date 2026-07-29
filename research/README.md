@@ -197,6 +197,20 @@ validation-window ES never pulled). Best PF 0.99 at t −0.1; ES→NQ
 extreme-divergence is fully priced at 1m, consistent with the cycle-2
 flow-horizon null. Details: research/results/cycle3_xmkt.md.
 
+## CYCLE 4 — user re-mandate 2026-07-28 ~21:30 ET (new-information slate)
+
+Slate: event_day → vol_regime (VX skipped, cost cap; ES-RV fallback) →
+overnight → daily_swing (research-only). Same protocol; 2026-07-28
+authorities carried over.
+
+**event_day verdict (2026-07-29): 0/144, CLOSED** — cpi_nfp follow PF
+1.9–2.0 but n=63–80 (thin early pre-markets halve events), t < 2,
+months + top10 fail. **vol_regime verdict (2026-07-29): 0/24, CLOSED,
+thesis INVERTED** — best point is the low-vol falsification arm (PF
+1.26, n=828, t 2.1, still concentration-sick); per the double-kill
+pre-commitment the trend_harvest revival dies with it. Details:
+research/results/cycle4_event_vol.md.
+
 **trend_harvest verdict (2026-07-29): 0/288, family CLOSED — CYCLE 3
 TERMINAL.** First sim-1.1 (trailing exits) family. Best point PF 1.20 on
 n=1,692 (t 2.5) is the only genuine broad drift ever measured here — and
