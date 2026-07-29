@@ -365,3 +365,38 @@ def test_event_day_anchor_reaction_and_arms():
     # etype mismatch: fomc grid point ignores a cpi day
     mo, _, _, _ = build(data, {**base, "etype": "fomc"})
     assert not mo["2024-02-13"][0].any()
+
+
+# ---------------------------------------------------------------- vol_regime
+
+def test_vol_regime_states_lag_and_min_history():
+    from app.research.families.vol_regime import states_from_rv
+    dates = [f"d{i:03d}" for i in range(80)]
+    rv = {d: float(i) for i, d in enumerate(dates)}   # rising vol
+    st = states_from_rv(dates, rv, k=5)
+    assert "d064" not in st                # 59 trailing measures: too few
+    assert "d066" in st                    # 61 trailing measures: ok
+    assert st["d079"] == 1.0               # rising series -> top percentile
+    # lag: the state for a session must not use that session's own rv
+    rv2 = dict(rv); rv2["d079"] = -999.0   # poisoning day-79 rv
+    st2 = states_from_rv(dates, rv2, k=5)
+    assert st2["d079"] == st["d079"]       # unchanged -> no lookahead
+
+
+def test_vol_regime_conditioner_gates_sessions():
+    from app.research.families import vol_regime
+    assert families.get("vol_regime").FAMILY == "vol_regime"
+    data = _th_session()                   # breakout session from trend_harvest tests
+    sd = "2024-01-08"
+    build_hi = vol_regime.make_build(vol_regime._prep(
+        data, {5: {sd: 0.9}, 20: {sd: 0.9}}))
+    p = {"N": 30, "trail_k": 3.0, "vol_k": 5, "cond": "high"}
+    m, s, t, w = build_hi(data, p)
+    assert list(np.flatnonzero(m[sd][0])) == [150]
+    assert s[sd][150] == pytest.approx((21005 - 21001) + 2.0 * 8.0)
+    assert t[sd][150] == pytest.approx(24.0)          # 3.0 x atr5
+    m2, _, _, _ = build_hi(data, {**p, "cond": "low"})
+    assert not m2[sd][0].any()             # high-vol session blocked by low arm
+    build_none = vol_regime.make_build(vol_regime._prep(data, {5: {}, 20: {}}))
+    m3, _, _, _ = build_none(data, p)
+    assert not m3[sd][0].any()             # no state -> no signals
