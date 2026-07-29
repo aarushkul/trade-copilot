@@ -322,3 +322,46 @@ def test_trend_harvest_breakout_stop_trail_and_cap():
     data["2024-01-08"].f["ema21_5m_dist_atr"][:] = -1.0
     m3, _, _, _ = build(data, {**base, "entries_cap": 2, "filt": "ema"})
     assert not m3["2024-01-08"][0].any()
+
+
+# ---------------------------------------------------------------- event_day
+
+def _ed_session(react=+6.0):
+    from app.research.families.common import SessionData
+    n = 460                                    # minutes 500..959
+    minute = np.arange(500, 500 + n, dtype=float)
+    close = np.full(n, 21000.0)
+    i1, i2 = 9, 69                             # minutes 509 / 569 (cpi_nfp)
+    close[i2:] = 21000.0 + react
+    return SessionData(
+        bars=[None] * n,
+        open=close.copy(), high=close + 1, low=close - 1, close=close,
+        minute_et=minute,
+        f={"atr_5m": np.full(n, 8.0), "minute_et": None},
+    )
+
+
+def test_event_day_anchor_reaction_and_arms():
+    from app.research.families import event_day
+    assert families.get("event_day").FAMILY == "event_day"
+    assert event_day.SIM_VERSION_OVERRIDE == "sim-1.1"
+    data = {"2024-02-13": _ed_session(+6.0),   # CPI day, up reaction
+            "2024-02-14": _ed_session(+6.0)}   # NOT an event day
+    cal = {"2024-02-13": "cpi_nfp"}
+    build = event_day.make_build(event_day._prep(data, cal))
+    base = {"etype": "cpi_nfp", "arm": "follow", "delay": 15, "mv": 0.0,
+            "trail_k": 2.0, "init_stop_s": 1.0}
+    m, s, t, w = build(data, base)
+    sig_l, sig_s = m["2024-02-13"]
+    assert list(np.flatnonzero(sig_l)) == [84]         # i2=69 + delay 15
+    assert s["2024-02-13"][84] == pytest.approx(8.0)   # 1.0 x atr5
+    assert t["2024-02-13"][84] == pytest.approx(16.0)  # 2.0 x atr5
+    assert not m["2024-02-14"][0].any()                # non-event day silent
+    mf, _, _, _ = build(data, {**base, "arm": "fade"})
+    assert list(np.flatnonzero(mf["2024-02-13"][1])) == [84]
+    # mv filter: |6| < 1.0*8 -> blocked
+    mm, _, _, _ = build(data, {**base, "mv": 1.0})
+    assert not mm["2024-02-13"][0].any()
+    # etype mismatch: fomc grid point ignores a cpi day
+    mo, _, _, _ = build(data, {**base, "etype": "fomc"})
+    assert not mo["2024-02-13"][0].any()
