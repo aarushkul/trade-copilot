@@ -211,6 +211,15 @@ thesis INVERTED** — best point is the low-vol falsification arm (PF
 pre-commitment the trend_harvest revival dies with it. Details:
 research/results/cycle4_event_vol.md.
 
+**onight verdict (2026-07-29): 0/8, CLOSED** — ON-range breaks in the
+eu window are sub-breakeven (PF 0.90–0.93, t < 0). **daily_swing
+verdict (2026-07-29): 0/12, CLOSED — CYCLE 4 TERMINAL** — best PF 1.25
+at t 1.1 with contradictory arms tied (noise); the daily horizon is
+efficient. Program lifetime: 25 pre-registered runs, 3,665
+configurations, zero survivors; every look intact. The affordable
+information map is complete; a cycle 5 needs new budget, data, or
+account scale. Full report: research/results/cycle4_terminal.md.
+
 **trend_harvest verdict (2026-07-29): 0/288, family CLOSED — CYCLE 3
 TERMINAL.** First sim-1.1 (trailing exits) family. Best point PF 1.20 on
 n=1,692 (t 2.5) is the only genuine broad drift ever measured here — and

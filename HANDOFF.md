@@ -17,16 +17,20 @@ days → `.venv/bin/python scripts/schwab_login.py` (interactive).
 
 ## The one-paragraph status
 
-**No tradeable signal edge exists on MNQ 1m at retail costs — measured,
-not suspected: 21 pre-registered runs, 3,477 evaluated configurations
-(2019–2025, five cycles of families incl. ML, orderflow, cross-market ES,
-and trailing-exit structures), zero passed the pre-registered train
-gates.** The one genuine drift found (trend_harvest breakout + 4×ATR
-trail: PF 1.20, n=1,692, t 2.5) is lottery-shaped — top-10 trades = 407%
-of net, 55% of months negative — structurally incapable of weekly income.
-All validation looks and the single holdout look are UNSPENT, reserved
-for a future cycle with genuinely new information (different timescale or
-data, not this corpus re-mined). The app's standing value is the
+**No tradeable signal edge exists for MNQ within any information source
+this project can afford — measured twice over: 25 pre-registered runs,
+3,665 evaluated configurations, zero passed the train gates.** Cycle 3
+(2026-07-28/29) exhausted intraday 1m price structure, cross-market ES,
+and exit engineering; cycle 4 (same night, user re-mandate) exhausted
+the new-information menu — scheduled macro events, external vol-state
+conditioning (thesis inverted: low-vol won), overnight sessions, and
+multi-day holds. The one genuine drift ever found (breakout + 4×ATR
+trail: PF 1.20, n=1,692, t 2.5) is lottery-shaped — top-10 trades =
+407% of net, 55% of months negative. All validation looks and the
+single holdout look are UNSPENT. Untested territory is priced out:
+sub-minute (~$122/yr/instrument), implied vol ($82), options
+positioning, internals. A cycle 5 needs new budget, new data, or a new
+account scale — a user decision. The app's standing value is the
 discipline layer: sizing, circuit breaker, journal, selectivity mode,
 levels/VWAP context. REAL MONEY OFF for signal-following.
 
@@ -43,6 +47,10 @@ levels/VWAP context. REAL MONEY OFF for signal-following.
 | 2026-07-28 | Cycle 3: compression (NR/coil) | 0/288; breakeven noise |
 | 2026-07-29 | Cycle 3: xmkt ES→NQ divergence ($8.51 ES pull) | 0/64; PF ≤ 0.99 — coupled at 1m |
 | 2026-07-29 | Cycle 3: trend_harvest (sim-1.1 trails) — TERMINAL | 0/288; drift real (PF 1.20/t 2.5) but top10 = 407% |
+| 2026-07-29 | Cycle 4: event_day (frozen macro calendar) | 0/144; same lottery, scarcer |
+| 2026-07-29 | Cycle 4: vol_regime (ES-RV state; VX skipped, cost) | 0/24; thesis INVERTED (low-vol won) → revival double-killed |
+| 2026-07-29 | Cycle 4: onight (eu window, ON-range breaks) | 0/8; PF 0.90–0.93 sub-breakeven |
+| 2026-07-29 | Cycle 4: daily_swing (sim-2-daily) — CYCLE 4 TERMINAL | 0/12; contradictory arms tied = noise |
 
 ## The research protocol (binding, research/README.md)
 
@@ -78,8 +86,11 @@ levels/VWAP context. REAL MONEY OFF for signal-following.
 ```
 
 Families: regime, tod, vwap_reversion, orb, trend_continuation, levels,
-levels_v2, gap, compression, xmkt, trend_harvest, ml, orderflow, ml_flow.
-ALL CLOSED as of cycle-3 terminal.
+levels_v2, gap, compression, xmkt, trend_harvest, event_day, vol_regime,
+onight, daily_swing, ml, orderflow, ml_flow. ALL CLOSED as of the
+cycle-4 terminal (2026-07-29). Fill models: sim-1 (brackets), sim-1.1
+(trail ratchet), sim-2-daily (multi-day holds) — all golden-tested.
+Frozen macro calendar: research/specs/event_calendar.json.
 
 ## Standing decisions & guardrails
 
