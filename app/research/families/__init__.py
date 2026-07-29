@@ -6,7 +6,7 @@ from importlib import import_module
 
 FAMILY_NAMES = ("regime", "tod", "vwap_reversion", "orb",
                 "trend_continuation", "levels", "levels_v2", "gap",
-                "compression", "xmkt", "trend_harvest", "event_day", "vol_regime", "onight", "ml", "orderflow",
+                "compression", "xmkt", "trend_harvest", "event_day", "vol_regime", "onight", "daily_swing", "ml", "orderflow",
                 "ml_flow")
 
 

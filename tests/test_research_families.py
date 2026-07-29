@@ -436,3 +436,38 @@ def test_onight_range_break_in_eu_window():
     # _prep range: includes bars up to 01:59 only — the 03:00 jump is excluded
     onh, onl = onight._prep(data)["2024-01-08"]
     assert onh == pytest.approx(21001.0) and onl == pytest.approx(20999.0)
+
+
+# -------------------------------------------------------------- daily_swing
+
+def test_daily_swing_sim2_golden_arithmetic():
+    from app.config import POINT_VALUE
+    from app.research.families import daily_swing
+    assert families.get("daily_swing").FAMILY == "daily_swing"
+
+    class _B:
+        __slots__ = ("ts",)
+        def __init__(self, t): self.ts = t
+
+    # hand-built daily rows: (sd, open, close, range, ts_open, ts_close)
+    rows = [(f"2024-01-{i:02d}", 100.0 + i, 100.5 + i, 10.0,
+             float(i * 1000), float(i * 1000 + 500)) for i in range(1, 13)]
+    # closes rise monotonically -> mom long triggers every day after N
+    p = {"N": 5, "hold": 1, "arm": "mom"}
+    trades = daily_swing.run_daily(rows, p)
+    assert trades, "monotone closes must trigger momentum"
+    tr = trades[0]
+    # first trigger: t=5 (needs 5 priors); entry day index 6 opens 107
+    assert tr.entry_px == pytest.approx(107.25)     # +1 tick slip
+    # exit day index 7 closes 108.5 - .25 slip
+    assert tr.exit_px == pytest.approx(108.25)
+    assert tr.pnl_usd == pytest.approx(1.0 * POINT_VALUE - 1.48)
+    assert tr.stop_pts == 10.0                      # prior-day range
+    # rev flips direction on the same trigger
+    tr2 = daily_swing.run_daily(rows, {**p, "arm": "rev"})[0]
+    assert tr2.direction == -1
+    assert tr2.entry_px == pytest.approx(106.75)
+    assert tr2.exit_px == pytest.approx(108.75)
+    assert tr2.pnl_usd == pytest.approx(-2.0 * POINT_VALUE - 1.48)
+    # busy rule: hold=1 occupies entry+exit days; triggers at t=6 skipped
+    assert trades[1].entry_i > tr.entry_i + 1
