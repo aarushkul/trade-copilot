@@ -215,3 +215,64 @@ def test_compression_nr_conditioner_needs_k_priors():
     p4 = {**p, "nr_k": 4}
     m4, _, _, _, _ = build(data, p4)
     assert m4["2024-01-08"][0].any()                 # k=4 qualified
+
+
+# --------------------------------------------------------------------- xmkt
+
+def _xmkt_data():
+    from app.research.families.common import SessionData
+    n = 200
+    base = 1_700_000_000
+    ts = base + np.arange(n) * 60.0
+    minute = np.concatenate([np.arange(1080, 1080 + 100, dtype=float),
+                             np.arange(570, 570 + 100, dtype=float)])
+    close = np.full(n, 21000.0)
+    high = close + 1.0
+    low = close - 1.0
+    # NQ: rising highs bars 101-110 (new-high events), then stalls
+    high[101:111] += np.arange(1, 11)
+    close[101:111] += np.arange(1, 11)
+
+    class _B:
+        __slots__ = ("ts",)
+        def __init__(self, t):
+            self.ts = t
+
+    d = SessionData(
+        bars=[_B(t) for t in ts],
+        open=close.copy(), high=high, low=low, close=close,
+        minute_et=minute,
+        f={"atr_5m": np.full(n, 8.0), "minute_et": None},
+    )
+    # ES: flat through bar 129, fresh highs at 130-131 while NQ is stale
+    es = {}
+    for i, t in enumerate(ts):
+        h = 5000.0
+        if i == 130:
+            h = 5002.0
+        elif i == 131:
+            h = 5003.0
+        es[int(t)] = (h, 4999.0)
+    return {"2024-01-08": d}, es
+
+
+def test_xmkt_divergence_follow_fade_and_missing_minute():
+    from app.research.families import xmkt
+    assert families.get("xmkt").FAMILY == "xmkt"
+    data, es = _xmkt_data()
+    prep = xmkt._prep(data, {"2024-01-08": es})
+    base = {"b": 5, "lag_k": 15, "window": "rth",
+            "stop_s": 0.5, "target_r": 1.0}
+    build = xmkt.make_build(prep)
+    m, s, _, _, _ = build(data, {**base, "arm": "follow"})
+    sig_l, sig_s = m["2024-01-08"]
+    assert list(np.flatnonzero(sig_l)) == [130]      # ES new high, NQ stale
+    assert s["2024-01-08"][130] == pytest.approx(5.0)  # 0.5*8 clamped to 5
+    mf, _, _, _, _ = build(data, {**base, "arm": "fade"})
+    assert list(np.flatnonzero(mf["2024-01-08"][1])) == [130]
+    # missing ES minute at 130 -> event slides to 131
+    es2 = dict(es)
+    del es2[int(data["2024-01-08"].bars[130].ts)]
+    prep2 = xmkt._prep(data, {"2024-01-08": es2})
+    m2, _, _, _, _ = xmkt.make_build(prep2)(data, {**base, "arm": "follow"})
+    assert list(np.flatnonzero(m2["2024-01-08"][0])) == [131]
