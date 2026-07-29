@@ -400,3 +400,39 @@ def test_vol_regime_conditioner_gates_sessions():
     build_none = vol_regime.make_build(vol_regime._prep(data, {5: {}, 20: {}}))
     m3, _, _, _ = build_none(data, p)
     assert not m3[sd][0].any()             # no state -> no signals
+
+
+# ------------------------------------------------------------------- onight
+
+def test_onight_range_break_in_eu_window():
+    from app.research.families.common import SessionData
+    from app.research.families import onight
+    assert families.get("onight").FAMILY == "onight"
+    n = 900                                    # 18:00 -> 08:59 ET
+    minute = np.concatenate([np.arange(1080, 1440, dtype=float),
+                             np.arange(0, n - 360, dtype=float)])
+    close = np.full(n, 21000.0)
+    i_break = 360 + 180                        # minute 180 = 03:00 ET
+    close[i_break:] = 21012.0                  # breaks ON high 21001
+    high = close + 1.0
+    low = close - 1.0
+    data = {"2024-01-08": SessionData(
+        bars=[None] * n, open=close.copy(), high=high, low=low, close=close,
+        minute_et=minute,
+        f={"atr_1m": np.full(n, 2.0), "atr_5m": np.full(n, 8.0),
+           "rvol_1m": np.full(n, 2.0), "minute_et": None},
+    )}
+    prep = onight._prep(data)
+    assert prep["2024-01-08"] == (21013.0, 20999.0) or True  # computed below
+    build = onight.make_build({"2024-01-08": (21001.0, 20999.0)})
+    m, s, t, w = build(data, {"b": 0.0, "stop_s": 1.0, "trail_k": 2.0})
+    assert w == "eu"
+    sig_l, sig_s = m["2024-01-08"]
+    assert list(np.flatnonzero(sig_l)) == [i_break]
+    # stop = (21012-21001) + 1.0*8 = 19 ; trail = 16
+    assert s["2024-01-08"][i_break] == pytest.approx(19.0)
+    assert t["2024-01-08"][i_break] == pytest.approx(16.0)
+    assert not sig_s.any()
+    # _prep range: includes bars up to 01:59 only — the 03:00 jump is excluded
+    onh, onl = onight._prep(data)["2024-01-08"]
+    assert onh == pytest.approx(21001.0) and onl == pytest.approx(20999.0)

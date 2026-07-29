@@ -22,6 +22,7 @@ WINDOWS = {                       # ET-minute signal windows (inclusive)
     "rth": (570, 945),            # 09:30..15:45 (run_rule default)
     "w1": (660, 840),             # 11:00..14:00 (tod-window-1)
     "w2": (630, 900),             # 10:30..15:00 (tod-window-2)
+    "eu": (120, 480),             # 02:00..08:00 (onight, cycle 4)
 }
 
 STOP_CLAMP = (5.0, 45.0)          # engine's live stop clamp, points
