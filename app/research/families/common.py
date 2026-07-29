@@ -153,6 +153,54 @@ def evaluate_grid(data: dict[str, SessionData], axes: dict[str, list],
     return rows
 
 
+def evaluate_grid_trail(data: dict[str, SessionData], axes: dict[str, list],
+                        build, verbose: bool = True
+                        ) -> list[tuple[dict, dict, dict]]:
+    """evaluate_grid for stop-only trailing exits (sim-1.1).
+
+    build(data, params) -> (masks, stops, trails, window_key). Same gates,
+    stress pass, and plateau rule as the bracket path.
+    """
+    points = grid_points(axes)
+    rows = []
+    pf_by_key: dict[tuple, float] = {}
+    sessions_bars = {sd: d.bars for sd, d in data.items()}
+    arrays = {sd: (d.open, d.high, d.low, d.close,
+                   np.array([b.ts for b in d.bars]), d.minute_et)
+              for sd, d in data.items()}
+    for n, p in enumerate(points):
+        masks, stops, trails, window_key = build(data, p)
+        window = WINDOWS[window_key]
+        trades = sim.run_rule_trail(sessions_bars, masks, stops, trails,
+                                    window=window, arrays=arrays)
+        m = stats.gate_metrics(trades)
+        stress_pf = None
+        if m.get("n", 0) >= 150 and m.get("pf", 0) >= 1.25:
+            stress = sim.run_rule_trail(sessions_bars, masks, stops, trails,
+                                        window=window, slippage_ticks=1.5,
+                                        arrays=arrays)
+            sm = stats.gate_metrics(stress)
+            stress_pf = sm.get("pf")
+            m["stress_pf"] = round(stress_pf, 3) if stress_pf is not None else None
+        g = stats.train_gates(m, stress_pf=stress_pf)
+        pf_by_key[_key(p)] = m.get("pf", 0.0)
+        rows.append((p, m, g))
+        if verbose and (n + 1) % 50 == 0:
+            print(f"  {n + 1}/{len(points)} grid points done")
+
+    for p, m, g in rows:
+        if not g["train_pass"]:
+            continue
+        neigh = [pf_by_key[_key(q)] for q in _neighbors(p, axes)
+                 if _key(q) in pf_by_key]
+        med = median(neigh) if neigh else 0.0
+        m["plateau_median_pf"] = round(med, 3)
+        if med < 1.15:
+            g["train_pass"] = False
+            g["failed"] = g.get("failed", []) + ["plateau_median_pf>=1.15"]
+    return rows
+
+
 def survivors(rows: list[tuple[dict, dict, dict]], axes: dict[str, list],
               max_n: int = 2) -> list[dict]:
     """<= max_n non-adjacent passers, best expectancy first."""

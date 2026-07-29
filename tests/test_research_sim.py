@@ -135,3 +135,95 @@ def test_run_rule_one_position_at_a_time():
     trades = sim.run_rule({"2024-03-05": bars}, masks, stops,
                           target_r=2.0, horizon_min=5)
     assert len(trades) == 1                     # busy until first trade exits
+
+
+# ------------------------------------------------------- sim-1.1 (trail)
+
+def _trail_args(bars):
+    return (np.array([b.open for b in bars]), np.array([b.high for b in bars]),
+            np.array([b.low for b in bars]), np.array([b.close for b in bars]),
+            np.array([b.ts for b in bars]),
+            np.array([sim._minute_et(b.ts) for b in bars]))
+
+
+def test_trail_ratchets_and_exits_at_trail_level():
+    bars = mk_bars([
+        (100, 101, 99.5, 100),                 # signal bar
+        (100, 104, 99, 103),                   # entry 100.25; ext becomes 104
+        (103, 103.5, 100.5, 101),              # eff = 104-3 = 101 -> TRAIL
+    ])
+    tr, j = sim.resolve_trail(*_trail_args(bars), 0, +1,
+                              stop_pts=5.0, trail_pts=3.0, session="s")
+    assert (tr.exit_reason, j) == ("TRAIL", 2)
+    assert tr.entry_px == 100.25
+    assert tr.exit_px == pytest.approx(100.75)          # 101 - 0.25 slip
+    assert tr.pnl_usd == pytest.approx(0.5 * POINT_VALUE - 1.48)
+
+
+def test_trail_gap_through_fills_at_open():
+    bars = mk_bars([
+        (100, 101, 99.5, 100),
+        (100, 104, 99, 103),
+        (100, 100.5, 98, 99),                  # opens below eff 101
+    ])
+    tr, _ = sim.resolve_trail(*_trail_args(bars), 0, +1,
+                              stop_pts=5.0, trail_pts=3.0, session="s")
+    assert tr.exit_reason == "TRAIL"
+    assert tr.exit_px == pytest.approx(99.75)           # open 100 - slip
+
+
+def test_trail_initial_stop_on_entry_bar_is_STOP():
+    bars = mk_bars([
+        (100, 101, 99.5, 100),
+        (100, 101, 95.0, 96),                  # low 95.0 <= stop 95.25
+    ])
+    tr, _ = sim.resolve_trail(*_trail_args(bars), 0, +1,
+                              stop_pts=5.0, trail_pts=3.0, session="s")
+    assert tr.exit_reason == "STOP"
+    assert tr.exit_px == pytest.approx(95.0)            # 95.25 - slip
+
+
+def test_trail_flat_at_1559():
+    start = datetime(2024, 3, 5, 15, 56, tzinfo=ET)
+    bars = mk_bars([
+        (100, 101, 99.5, 100),                 # 15:56 signal
+        (100, 101, 99.5, 100.5),               # 15:57 entry
+        (100.5, 102, 99.6, 101),               # 15:58
+        (107, 107.5, 106, 107),                # 15:59 -> FLAT at open
+    ], start=start)
+    tr, j = sim.resolve_trail(*_trail_args(bars), 0, +1,
+                              stop_pts=5.0, trail_pts=30.0, session="s")
+    assert (tr.exit_reason, j) == ("FLAT", 3)
+    assert tr.exit_px == pytest.approx(106.75)
+    assert tr.pnl_usd == pytest.approx(6.5 * POINT_VALUE - 1.48)
+
+
+def test_trail_short_mirror():
+    bars = mk_bars([
+        (100, 100.5, 99.5, 100),
+        (100, 100.5, 96, 97),                  # entry 99.75; ext(low) 96
+        (98, 99.5, 97.5, 99),                  # eff = 96+3 = 99 -> TRAIL
+    ])
+    tr, _ = sim.resolve_trail(*_trail_args(bars), 0, -1,
+                              stop_pts=5.0, trail_pts=3.0, session="s")
+    assert tr.exit_reason == "TRAIL"
+    assert tr.exit_px == pytest.approx(99.25)           # max(98,99) + slip
+    assert tr.pnl_usd == pytest.approx(0.5 * POINT_VALUE - 1.48)
+
+
+def test_run_rule_trail_busy_consumes_second_signal():
+    bars = mk_bars([
+        (100, 101, 99.5, 100),                 # signal 1
+        (100, 104, 99, 103),                   # entry
+        (103, 103.5, 100.5, 101),              # TRAIL exit here (busy till 2)
+        (101, 101.5, 100.5, 101),              # signal 2 at i=3 -> allowed
+        (101, 101.2, 96, 97),
+    ])
+    long_m = np.zeros(5, bool); long_m[[0, 1, 3]] = True   # i=1 busy-skipped
+    short_m = np.zeros(5, bool)
+    stops = np.full(5, 5.0); trails = np.full(5, 3.0)
+    trades = sim.run_rule_trail({"s": bars}, {"s": (long_m, short_m)},
+                                {"s": stops}, {"s": trails})
+    assert len(trades) == 2
+    assert trades[0].exit_reason == "TRAIL"
+    assert trades[1].entry_i == 4

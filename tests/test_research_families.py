@@ -276,3 +276,49 @@ def test_xmkt_divergence_follow_fade_and_missing_minute():
     prep2 = xmkt._prep(data, {"2024-01-08": es2})
     m2, _, _, _, _ = xmkt.make_build(prep2)(data, {**base, "arm": "follow"})
     assert list(np.flatnonzero(m2["2024-01-08"][0])) == [131]
+
+
+# ------------------------------------------------------------ trend_harvest
+
+def _th_session():
+    from app.research.families.common import SessionData
+    n = 200
+    close = np.full(n, 21000.0)
+    close[150] = 21005.0                       # breakout over 21001
+    close[151:170] = 21010.0
+    close[170] = 21015.0                       # second breakout over 21011
+    close[171:] = 21012.0
+    high = close + 1.0
+    low = close - 1.0
+    minute = np.concatenate([np.arange(1080, 1080 + 100, dtype=float),
+                             np.arange(570, 570 + 100, dtype=float)])
+    return {"2024-01-08": SessionData(
+        bars=[None] * n,
+        open=close.copy(), high=high, low=low, close=close,
+        minute_et=minute,
+        f={"atr_5m": np.full(n, 8.0), "rvol_1m": np.full(n, 2.0),
+           "ema21_5m_dist_atr": np.full(n, 1.0), "minute_et": None},
+    )}
+
+
+def test_trend_harvest_breakout_stop_trail_and_cap():
+    from app.research.families import trend_harvest
+    assert families.get("trend_harvest").FAMILY == "trend_harvest"
+    assert trend_harvest.SIM_VERSION_OVERRIDE == "sim-1.1"
+    data = _th_session()
+    build = trend_harvest.make_build(trend_harvest._prep(data))
+    base = {"N": 30, "filt": "none", "rvol_f": 1.0, "trail_k": 2.0,
+            "init_stop_s": 1.0, "window": "rth"}
+    m1, s1, t1, w = build(data, {**base, "entries_cap": 1})
+    sig_l, sig_s = m1["2024-01-08"]
+    assert list(np.flatnonzero(sig_l)) == [150]
+    assert not sig_s.any()
+    # stop = (21005-21001) + 1.0*8 = 12 ; trail = 2*8 = 16
+    assert s1["2024-01-08"][150] == pytest.approx(12.0)
+    assert t1["2024-01-08"][150] == pytest.approx(16.0)
+    m2, _, _, _ = build(data, {**base, "entries_cap": 2})
+    assert list(np.flatnonzero(m2["2024-01-08"][0])) == [150, 170]
+    # ema filter with positive dist keeps longs; flipped sign blocks them
+    data["2024-01-08"].f["ema21_5m_dist_atr"][:] = -1.0
+    m3, _, _, _ = build(data, {**base, "entries_cap": 2, "filt": "ema"})
+    assert not m3["2024-01-08"][0].any()

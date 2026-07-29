@@ -40,7 +40,7 @@ def main() -> None:
         "hypothesis": mod.HYPOTHESIS,
         "params_grid": mod.PARAMS_GRID,
         "feature_version": FEATURE_VERSION,
-        "sim_version": SIM_VERSION,
+        "sim_version": getattr(mod, "SIM_VERSION_OVERRIDE", SIM_VERSION),
         "data_fingerprint": fp,
     }
     run_id = ledger.register(spec)

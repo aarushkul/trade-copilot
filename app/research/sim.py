@@ -111,6 +111,124 @@ def resolve_bracket(bars: list[Bar], signal_i: int, direction: int,
                      last.ts, last.close - direction * slip, "FLAT", stop_pts)
 
 
+# --------------------------------------------------------------- sim-1.1
+# Trailing-exit fill model (research/specs/trend_harvest.md). sim-1 above
+# is untouched; registrations using trails record SIM_TRAIL_VERSION.
+
+SIM_TRAIL_VERSION = "sim-1.1"
+
+
+def resolve_trail(opens: np.ndarray, highs: np.ndarray, lows: np.ndarray,
+                  closes: np.ndarray, ts: np.ndarray, minutes: np.ndarray,
+                  signal_i: int, direction: int, stop_pts: float,
+                  trail_pts: float, session: str = "",
+                  slippage_ticks: float = SLIPPAGE_TICKS
+                  ) -> tuple[Trade, int] | None:
+    """One stop-only trade with a monotone ATR ratchet (spec sim-1.1).
+
+    effective stop = max(initial, post-entry extreme of PRIOR closed bars
+    − trail_pts) for longs (mirror shorts); trail_pts frozen at signal.
+    Returns (trade, exit_bar_index) or None if no entry is possible.
+    """
+    entry_i = signal_i + 1
+    n = len(opens)
+    if entry_i >= n or minutes[entry_i] >= FLAT_MINUTE_ET:
+        return None
+    slip = slippage_ticks * TICK_SIZE
+    entry_px = opens[entry_i] + direction * slip
+    stop_px = entry_px - direction * stop_pts
+
+    flat_hits = np.flatnonzero(minutes[entry_i:] >= FLAT_MINUTE_ET)
+    flat_j = entry_i + int(flat_hits[0]) if len(flat_hits) else n
+    o = opens[entry_i:flat_j]
+    h = highs[entry_i:flat_j]
+    lo = lows[entry_i:flat_j]
+
+    if direction > 0:
+        ext = np.maximum.accumulate(h)
+        prior = np.concatenate(([-np.inf], ext[:-1]))
+        eff = np.maximum(stop_px, prior - trail_pts)
+        hit = lo <= eff
+    else:
+        ext = np.minimum.accumulate(lo)
+        prior = np.concatenate(([np.inf], ext[:-1]))
+        eff = np.minimum(stop_px, prior + trail_pts)
+        hit = h >= eff
+    hits = np.flatnonzero(hit)
+    if len(hits):
+        k = int(hits[0])
+        j = entry_i + k
+        level = float(eff[k])
+        raw = min(o[k], level) if direction > 0 else max(o[k], level)
+        px = raw - direction * slip
+        reason = "TRAIL" if (direction > 0 and level > stop_px) or \
+                            (direction < 0 and level < stop_px) else "STOP"
+        return _finalize(session, direction, entry_i, ts[entry_i], entry_px,
+                         ts[j], px, reason, stop_pts), j
+    if flat_j < n:
+        return _finalize(session, direction, entry_i, ts[entry_i], entry_px,
+                         ts[flat_j], opens[flat_j] - direction * slip,
+                         "FLAT", stop_pts), flat_j
+    return _finalize(session, direction, entry_i, ts[entry_i], entry_px,
+                     ts[n - 1], closes[n - 1] - direction * slip,
+                     "FLAT", stop_pts), n - 1
+
+
+def run_rule_trail(sessions: dict[str, list[Bar]],
+                   masks: dict[str, tuple[np.ndarray, np.ndarray]],
+                   stop_pts_by_session: dict[str, np.ndarray],
+                   trail_pts_by_session: dict[str, np.ndarray],
+                   window: tuple[int, int] = (570, 945),
+                   slippage_ticks: float = SLIPPAGE_TICKS,
+                   arrays: dict[str, tuple] | None = None) -> list[Trade]:
+    """run_rule's skeleton with stop-only trailing exits (sim-1.1).
+
+    `arrays` optionally supplies precomputed per-session
+    (opens, highs, lows, closes, ts, minutes) to avoid rebuilding them
+    on every grid point; contents must match `sessions` bar-for-bar.
+    """
+    trades: list[Trade] = []
+    for sd, bars in sessions.items():
+        if sd not in masks:
+            continue
+        long_m, short_m = masks[sd]
+        stops = stop_pts_by_session[sd]
+        trails = trail_pts_by_session[sd]
+        n = len(bars)
+        if arrays is not None and sd in arrays:
+            opens, highs, lows, closes, ts, minutes = arrays[sd]
+        else:
+            opens = np.array([b.open for b in bars])
+            highs = np.array([b.high for b in bars])
+            lows = np.array([b.low for b in bars])
+            closes = np.array([b.close for b in bars])
+            ts = np.array([b.ts for b in bars])
+            minutes = np.array([_minute_et(t) for t in ts])
+        busy_until = -1
+        for i in range(n - 1):
+            if i <= busy_until:
+                continue
+            direction = 1 if long_m[i] else (-1 if short_m[i] else 0)
+            if not direction:
+                continue
+            if not (window[0] <= minutes[i] <= window[1]):
+                continue
+            stop_pts = float(stops[i])
+            trail_pts = float(trails[i])
+            if not (np.isfinite(stop_pts) and stop_pts > 0
+                    and np.isfinite(trail_pts) and trail_pts > 0):
+                continue
+            out = resolve_trail(opens, highs, lows, closes, ts, minutes,
+                                i, direction, stop_pts, trail_pts,
+                                session=sd, slippage_ticks=slippage_ticks)
+            if out is None:
+                continue
+            tr, exit_j = out
+            trades.append(tr)
+            busy_until = exit_j
+    return trades
+
+
 FORWARD_PREFIX = "fwd_"
 
 
