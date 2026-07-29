@@ -190,3 +190,9 @@ base + rare trend-day outliers, measured now across four event
 archetypes. Remaining slate: cross-market ES→NQ, then a trend-day-harvest
 exit-structure spec (sim version bump for trailing exits), each
 registered blind. Details: research/results/cycle3_gap_compression.md.
+
+**xmkt verdict (2026-07-29): 0/64, family CLOSED (scoped ≥1m)** — ES
+train corpus pulled under the registration ($8.51, fence physical:
+validation-window ES never pulled). Best PF 0.99 at t −0.1; ES→NQ
+extreme-divergence is fully priced at 1m, consistent with the cycle-2
+flow-horizon null. Details: research/results/cycle3_xmkt.md.
