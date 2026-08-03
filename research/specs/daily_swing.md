@@ -3,8 +3,8 @@
 Registered blind 2026-07-29, before any evaluation. Grid frozen at
 registration; any change is a new spec. Cycle-4 family 4 (final slate
 item). RESEARCH-ONLY label, stated up front: multi-day holds are
-untradeable on the user's ~$1,200 account (MNQ overnight margin ≈
-$2,300); a pass produces knowledge and a future-account option, never an
+untradeable at the user's current account size (below MNQ overnight
+margin); a pass produces knowledge and a future-account option, never an
 advisory call under current sizing.
 
 ## Hypothesis

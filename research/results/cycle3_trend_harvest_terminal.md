@@ -55,7 +55,7 @@ single holdout look remain UNSPENT.**
   configuration in 3,477 tries spanning 2019–2025. That is a measured
   property of the market at this timescale and cost structure, not a
   failure of effort or intelligence.
-- The weekly-income framing ($500/wk) is structurally incompatible with
+- A steady-weekly-income framing is structurally incompatible with
   the one real drift found: intraday trend capture pays like a lottery
   (55% losing months), not like a salary — and it is sub-gate anyway.
 - The look budgets survive intact. They are reserved for a future cycle

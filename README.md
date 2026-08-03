@@ -162,5 +162,5 @@ metric. Exit shape was measured the same way: fixed scalp brackets
 (PF 0.31–0.50) and fewer-but-bigger variants (higher fire threshold, 6R
 runners) all did worse than the default half-at-1R / runner-to-2R
 management, so trade the calls as given — don't bank $50 early and don't
-hold out for the home run. Validate stats on paper before sizing up, and remember $150 risk on
-a $1,200 account is aggressive; the circuit breaker exists for a reason.
+hold out for the home run. Validate stats on paper before sizing up, and remember that risking
+over 10% of a small account per trade is aggressive; the circuit breaker exists for a reason.

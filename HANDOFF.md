@@ -11,7 +11,7 @@ auto-memory.
 Advisory-only day-trading copilot for MNQ (Micro Nasdaq futures): Schwab
 feed → 1m bars → signal engine → SQLite journal → FastAPI dashboard
 (http://127.0.0.1:8000). It never places trades. User trades manually in
-NinjaTrader with a ~$1,200 account. Start: `./start.sh` or the
+NinjaTrader with a small personal account. Start: `./start.sh` or the
 `Start Trade Copilot.command` icon. Schwab refresh tokens die every ~7
 days → `.venv/bin/python scripts/schwab_login.py` (interactive).
 
@@ -114,9 +114,9 @@ Frozen macro calendar: research/specs/event_calendar.json.
 
 ## User context
 
-Aarush trades MNQ manually with ~$1,200; goal framing 2026-07-28 was
-"+$500/week" — told honestly (measured): no validated edge does that at
-this account size, and the one real drift found is structurally
+The user trades MNQ manually with a small personal account; the stated
+income goal was assessed honestly (measured): no validated edge supports
+it at this account size, and the one real drift found is structurally
 lottery-shaped. User owns sizing/scaling decisions; the machine owns
 signal/exit research under the protocol. Decisive framings that landed:
 winrate ≠ expectancy, look budgets as one-shot resources, friction toll,
